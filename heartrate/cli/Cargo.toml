@@ -1,0 +1,14 @@
+[package]
+name = "heartrate_cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+heartrate_core.workspace = true
+
+btleplug = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }

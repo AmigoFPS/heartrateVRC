@@ -1,0 +1,117 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod app;
+
+use std::sync::mpsc;
+
+use btleplug::{Error, api::Peripheral};
+use eframe::egui;
+use heartrate_core::{
+    heartrate_device::HeartrateDevice,
+    hrv::{HrvAnalyzer, HrvMetrics},
+    osc::OscSender,
+    settings_manager::AppSettings,
+};
+
+pub enum BleEvent {
+    Scanning,
+    Connected(String),
+    Disconnected,
+    Data { bpm: i32, hrv: Option<HrvMetrics> },
+    FatalError(String),
+}
+
+fn main() -> eframe::Result {
+    let (tx, rx) = mpsc::channel();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        rt.block_on(ble_worker(tx));
+    });
+
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([320.0, 480.0])
+            .with_min_inner_size([320.0, 480.0]),
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "HeartRate OSC",
+        options,
+        Box::new(|cc| Ok(Box::new(app::HeartRateApp::new(cc, rx)))),
+    )
+}
+
+async fn ble_worker(tx: mpsc::Sender<BleEvent>) {
+    let settings = match AppSettings::try_load_from_file("settings.json") {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = tx.send(BleEvent::FatalError(format!("Settings: {e}")));
+            return;
+        }
+    };
+
+    let mut host = match HeartrateDevice::new().await {
+        Ok(h) => h,
+        Err(e) => {
+            let _ = tx.send(BleEvent::FatalError(format!("Bluetooth: {e}")));
+            return;
+        }
+    };
+
+    let sender = OscSender::new([127, 0, 0, 1], settings.send_port());
+    let mut hrv_analyzer = HrvAnalyzer::new();
+    let mut scanning = true;
+    let _ = tx.send(BleEvent::Scanning);
+
+    loop {
+        if scanning {
+            match host.auto_connect().await {
+                Ok(device) => {
+                    let name = device
+                        .properties()
+                        .await
+                        .unwrap_or_default()
+                        .and_then(|p| p.local_name)
+                        .unwrap_or_default();
+                    hrv_analyzer = HrvAnalyzer::new();
+                    let _ = tx.send(BleEvent::Connected(name));
+                    scanning = false;
+                }
+                Err(err) => match err {
+                    Error::DeviceNotFound
+                    | Error::NotConnected
+                    | Error::NoSuchCharacteristic
+                    | Error::TimedOut(_) => continue,
+                    other => {
+                        let _ = tx.send(BleEvent::FatalError(format!("{other}")));
+                        return;
+                    }
+                },
+            }
+        } else {
+            match host.get_bpm().await {
+                Ok((bpm, rr_intervals)) => {
+                    hrv_analyzer.add_rr_intervals(&rr_intervals);
+                    let hrv = hrv_analyzer.compute();
+
+                    let _ = sender.send_bpm(
+                        bpm,
+                        settings.float_addresses(),
+                        settings.int_addresses(),
+                    );
+                    if let Some(ref m) = hrv {
+                        let _ = sender.send_hrv(m, settings.hrv_addresses());
+                    }
+
+                    let _ = tx.send(BleEvent::Data { bpm, hrv });
+                }
+                Err(_) => {
+                    scanning = true;
+                    let _ = tx.send(BleEvent::Disconnected);
+                }
+            }
+        }
+    }
+}

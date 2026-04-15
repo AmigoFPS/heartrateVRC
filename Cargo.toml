@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = ["heartrate/*"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["Amigo_FPS"]
+license = "MIT"
+
+[workspace.dependencies]
+heartrate_core = { path = "heartrate/core" }
+heartrate_cli = { path = "heartrate/cli" }
+
+btleplug = "0.12.0"
+tokio = { version = "1.0", features = ["full"] }
+uuid = "1.0"
+futures = "0.3"
+rosc = "0.11.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+eframe = "0.31"
+egui_plot = "0.31"
+
+[profile.release]
+debug = "limited"
+strip = false
+
+[profile.distribution]
+inherits = "release"
+lto = true

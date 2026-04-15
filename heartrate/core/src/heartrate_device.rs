@@ -51,6 +51,8 @@ impl HeartrateDevice {
 
         tokio::time::sleep(Duration::from_secs(5)).await;
 
+        let _ = self.adapter.stop_scan().await;
+
         let devices = self.adapter.peripherals().await?;
         let device = devices
             .into_iter()

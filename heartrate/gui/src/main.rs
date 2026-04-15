@@ -52,66 +52,85 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>) {
         }
     };
 
-    let mut host = match HeartrateDevice::new().await {
-        Ok(h) => h,
-        Err(e) => {
-            let _ = tx.send(BleEvent::FatalError(format!("Bluetooth: {e}")));
-            return;
-        }
-    };
-
-    let sender = OscSender::new([127, 0, 0, 1], settings.send_port());
-    let mut hrv_analyzer = HrvAnalyzer::new();
-    let mut scanning = true;
-    let _ = tx.send(BleEvent::Scanning);
-
     loop {
-        if scanning {
-            match host.auto_connect().await {
-                Ok(device) => {
-                    let name = device
-                        .properties()
-                        .await
-                        .unwrap_or_default()
-                        .and_then(|p| p.local_name)
-                        .unwrap_or_default();
-                    hrv_analyzer = HrvAnalyzer::new();
-                    let _ = tx.send(BleEvent::Connected(name));
-                    scanning = false;
-                }
-                Err(err) => match err {
-                    Error::DeviceNotFound
-                    | Error::NotConnected
-                    | Error::NoSuchCharacteristic
-                    | Error::TimedOut(_) => continue,
-                    other => {
-                        let _ = tx.send(BleEvent::FatalError(format!("{other}")));
-                        return;
-                    }
-                },
+        let mut host = match HeartrateDevice::new().await {
+            Ok(h) => h,
+            Err(e) => {
+                let _ = tx.send(BleEvent::FatalError(format!("Bluetooth: {e}")));
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
             }
-        } else {
-            match host.get_bpm().await {
-                Ok((bpm, rr_intervals)) => {
-                    hrv_analyzer.add_rr_intervals(&rr_intervals);
-                    let hrv = hrv_analyzer.compute();
+        };
 
-                    let _ = sender.send_bpm(
-                        bpm,
-                        settings.float_addresses(),
-                        settings.int_addresses(),
-                    );
-                    if let Some(ref m) = hrv {
-                        let _ = sender.send_hrv(m, settings.hrv_addresses());
+        let sender = OscSender::new([127, 0, 0, 1], settings.send_port());
+        let mut hrv_analyzer = HrvAnalyzer::new();
+        let mut scanning = true;
+        let _ = tx.send(BleEvent::Scanning);
+
+        loop {
+            if scanning {
+                match host.auto_connect().await {
+                    Ok(device) => {
+                        let name = device
+                            .properties()
+                            .await
+                            .unwrap_or_default()
+                            .and_then(|p| p.local_name)
+                            .unwrap_or_default();
+                        hrv_analyzer = HrvAnalyzer::new();
+                        let _ = tx.send(BleEvent::Connected(name));
+                        scanning = false;
                     }
-
-                    let _ = tx.send(BleEvent::Data { bpm, hrv });
+                    Err(err) => match err {
+                        Error::DeviceNotFound
+                        | Error::NotConnected
+                        | Error::NoSuchCharacteristic
+                        | Error::TimedOut(_) => continue,
+                        other => {
+                            eprintln!("Connection error: {:?}", other);
+                            let _ = tx.send(BleEvent::FatalError(format!("{other}")));
+                            break;
+                        }
+                    },
                 }
-                Err(_) => {
-                    scanning = true;
-                    let _ = tx.send(BleEvent::Disconnected);
+            } else {
+                match host.get_bpm().await {
+                    Ok((bpm, rr_intervals)) => {
+                        hrv_analyzer.add_rr_intervals(&rr_intervals);
+                        let hrv = hrv_analyzer.compute();
+
+                        let _ = sender.send_bpm(
+                            bpm,
+                            settings.float_addresses(),
+                            settings.int_addresses(),
+                        );
+
+                        if let Some(ref m) = hrv {
+                            let _ = sender.send_hrv(m, settings.hrv_addresses());
+                        }
+
+                        let _ = tx.send(BleEvent::Data { bpm, hrv });
+                    }
+                    Err(err) => {
+                        eprintln!("Get BPM error: {:?}", err);
+                        match err {
+                            Error::DeviceNotFound | Error::NotConnected | Error::TimedOut(_) => {
+                                let _ = tx.send(BleEvent::Disconnected);
+                                scanning = true;
+                                continue;
+                            }
+                            other => {
+                                eprintln!("Unrecoverable error: {:?}", other);
+                                let _ = tx.send(BleEvent::FatalError(format!("{other}")));
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
+
+        let _ = host.disconnect().await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }

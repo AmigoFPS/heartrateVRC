@@ -15,6 +15,26 @@ pub struct HeartrateDevice {
     target_device: Option<btleplug::platform::Peripheral>,
 }
 
+pub struct BpmData {
+    pub bpm: i32,
+    pub intervals: Vec<u16>,
+}
+
+#[derive(Default)]
+pub struct HeartrateData {
+    pub bpm: u16,
+    pub intervals: Vec<u16>,
+}
+
+impl Into<BpmData> for HeartrateData {
+    fn into(self) -> BpmData {
+        BpmData {
+            bpm: self.bpm as i32,
+            intervals: self.intervals,
+        }
+    }
+}
+
 impl HeartrateDevice {
     pub async fn new() -> Result<Self, btleplug::Error> {
         let manager = platform::Manager::new().await?;
@@ -78,7 +98,7 @@ impl HeartrateDevice {
         }
     }
 
-    pub async fn get_bpm(&self) -> Result<(i32, Vec<u16>), btleplug::Error> {
+    pub async fn get_bpm(&self) -> Result<BpmData, btleplug::Error> {
         let target_device = self
             .target_device
             .as_ref()
@@ -95,8 +115,8 @@ impl HeartrateDevice {
                     .map_err(|_| btleplug::Error::DeviceNotFound)? // Timeout hit
                     .ok_or(btleplug::Error::DeviceNotFound)?;
 
-                let (bpm, rr_intervals) = HeartrateDevice::parse_heart_rate_full(&value_notification.value);
-                Ok((bpm as i32, rr_intervals))
+                let data = HeartrateDevice::parse_heart_rate_full(&value_notification.value);
+                Ok(data.into())
             }
             Err(e) => {
                 eprintln!("Failed to get notifications: {:?}", e);
@@ -105,9 +125,9 @@ impl HeartrateDevice {
         }
     }
 
-    fn parse_heart_rate_full(data: &[u8]) -> (u16, Vec<u16>) {
+    fn parse_heart_rate_full(data: &[u8]) -> HeartrateData {
         if data.is_empty() {
-            return (0, vec![]);
+            return HeartrateData::default();
         }
 
         let flags = data[0];
@@ -139,6 +159,9 @@ impl HeartrateDevice {
             vec![]
         };
 
-        (bpm, rr_intervals)
+        HeartrateData {
+            bpm,
+            intervals: rr_intervals,
+        }
     }
 }

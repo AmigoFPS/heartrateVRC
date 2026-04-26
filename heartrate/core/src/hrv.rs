@@ -1,9 +1,7 @@
 use std::collections::VecDeque;
 
 const RR_UNIT_MS: f64 = 1000.0 / 1024.0;
-
 const MIN_INTERVALS: usize = 10;
-
 const WINDOW_SIZE: usize = 256;
 
 #[derive(Debug, Clone)]
@@ -71,11 +69,7 @@ impl HrvAnalyzer {
             0.0
         };
 
-        Some(HrvMetrics {
-            rmssd,
-            sdnn,
-            pnn50,
-        })
+        Some(HrvMetrics { rmssd, sdnn, pnn50 })
     }
 }
 

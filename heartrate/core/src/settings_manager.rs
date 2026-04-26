@@ -7,16 +7,7 @@ pub struct AppSettings {
     correction: i32,
     float_addresses: Vec<String>,
     int_addresses: Vec<String>,
-    #[serde(default = "default_hrv_addresses")]
     hrv_addresses: Vec<String>,
-}
-
-fn default_hrv_addresses() -> Vec<String> {
-    vec![
-        "/avatar/parameters/HRV_RMSSD".to_owned(),
-        "/avatar/parameters/HRV_SDNN".to_owned(),
-        "/avatar/parameters/HRV_pNN50".to_owned(),
-    ]
 }
 
 impl AppSettings {
@@ -46,7 +37,6 @@ impl Default for AppSettings {
         Self {
             send_port: 9000,
             correction: 0,
-            hrv_addresses: default_hrv_addresses(),
             float_addresses: vec![
                 "/avatar/parameters/Heartrate_OSC".to_owned(),
                 "/avatar/parameters/Heartrate2".to_owned(),
@@ -55,6 +45,11 @@ impl Default for AppSettings {
             int_addresses: vec![
                 "/avatar/parameters/HeartrateInt".to_owned(),
                 "/avatar/parameters/HR".to_owned(),
+            ],
+            hrv_addresses: vec![
+                "/avatar/parameters/HRV_RMSSD".to_owned(),
+                "/avatar/parameters/HRV_SDNN".to_owned(),
+                "/avatar/parameters/HRV_pNN50".to_owned(),
             ],
         }
     }

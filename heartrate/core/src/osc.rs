@@ -61,11 +61,7 @@ impl OscSender {
         Ok(())
     }
 
-    pub fn send_hrv(
-        &self,
-        metrics: &HrvMetrics,
-        addresses: &[String],
-    ) -> Result<(), rosc::OscError> {
+    pub fn send_hrv(&self, metrics: &HrvMetrics, addresses: &[String]) -> Result<(), rosc::OscError> {
         let values = [
             (metrics.rmssd / 200.0).min(1.0),
             (metrics.sdnn / 200.0).min(1.0),

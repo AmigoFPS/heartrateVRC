@@ -1,9 +1,6 @@
 use btleplug::{Error, api::Peripheral};
 use heartrate_core::{
-    heartrate_device::HeartrateDevice,
-    hrv::HrvAnalyzer,
-    osc::OscSender,
-    settings_manager::AppSettings,
+    heartrate_device::HeartrateDevice, hrv::HrvAnalyzer, osc::OscSender, settings_manager::AppSettings,
 };
 use std::time::Duration;
 
@@ -27,33 +24,32 @@ async fn main() {
                     state = AppState::Sending;
                     continue;
                 }
-                Err(err) => match err {
-                    Error::DeviceNotFound | Error::NotConnected => {
-                        eprintln!("Device not found, continuing search...");
-                        state = AppState::Scanning;
-                        continue;
+                Err(err) => {
+                    let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+                    match err {
+                        Error::DeviceNotFound | Error::NotConnected => {
+                            eprintln!("Device not found, continuing search...");
+                            state = AppState::Scanning;
+                            continue;
+                        }
+                        Error::NoSuchCharacteristic => {
+                            eprintln!("Found device but NoSuchCharacteristic, continuing search...");
+                            state = AppState::Scanning;
+                            continue;
+                        }
+                        Error::TimedOut(duration) => {
+                            eprintln!("Time out {}, continuing search...", duration.as_millis());
+                            state = AppState::Scanning;
+                            continue;
+                        }
+                        _ => panic!("Error: {}", err),
                     }
-                    Error::NoSuchCharacteristic => {
-                        eprintln!("Found device but NoSuchCharacteristic, continuing search...");
-                        state = AppState::Scanning;
-                        continue;
-                    }
-                    Error::TimedOut(duration) => {
-                        eprintln!("Time out {}, continuing search...", duration.as_millis());
-                        state = AppState::Scanning;
-                        continue;
-                    }
-                    _ => panic!("Error: {}", err),
-                },
+                }
             },
             AppState::Sending => match host.get_bpm().await {
-                Ok((bpm, rr_intervals)) => {
-                    hrv_analyzer.add_rr_intervals(&rr_intervals);
-                    if let Err(err) = sender.send_bpm(
-                        bpm,
-                        settings.float_addresses(),
-                        settings.int_addresses(),
-                    ) {
+                Ok(data) => {
+                    hrv_analyzer.add_rr_intervals(&data.intervals);
+                    if let Err(err) = sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses()) {
                         panic!("Osc sending error: {}", err);
                     }
                     if let Some(metrics) = hrv_analyzer.compute() {
@@ -62,14 +58,15 @@ async fn main() {
                         }
                         println!(
                             "Sending {} BPM | HRV RMSSD:{:.1} SDNN:{:.1} pNN50:{:.1}",
-                            bpm, metrics.rmssd, metrics.sdnn, metrics.pnn50
+                            data.bpm, metrics.rmssd, metrics.sdnn, metrics.pnn50
                         );
                     } else {
-                        println!("Sending {} BPM", bpm);
+                        println!("Sending {} BPM", data.bpm);
                     }
                 }
                 Err(err) => {
                     eprintln!("Error: {}, searching for device...", err);
+                    let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
                     let _ = host.disconnect().await;
                     state = AppState::Scanning;
                     tokio::time::sleep(Duration::from_millis(500)).await;

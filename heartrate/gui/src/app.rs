@@ -23,7 +23,6 @@ const RED: Color32 = Color32::from_rgb(195, 65, 65);
 const MAX_PTS: usize = 600;
 const VIEW_SEC: f64 = 60.0;
 
-
 enum Status {
     Scanning,
     Connected(String),
@@ -92,7 +91,6 @@ impl HeartRateApp {
             }
         }
     }
-
 }
 
 impl eframe::App for HeartRateApp {
@@ -123,9 +121,7 @@ impl eframe::App for HeartRateApp {
                         ui.add_space(4.0);
                         ui.label(
                             RichText::new("♥")
-                                .color(Color32::from_rgba_unmultiplied(
-                                    HEART.r(), HEART.g(), HEART.b(), heart_alpha,
-                                ))
+                                .color(Color32::from_rgba_unmultiplied(HEART.r(), HEART.g(), HEART.b(), heart_alpha))
                                 .size(22.0),
                         );
                         let bpm_text = if self.bpm > 0 {
@@ -133,12 +129,7 @@ impl eframe::App for HeartRateApp {
                         } else {
                             "—".into()
                         };
-                        ui.label(
-                            RichText::new(bpm_text)
-                                .color(TEXT_HI)
-                                .size(46.0)
-                                .strong(),
-                        );
+                        ui.label(RichText::new(bpm_text).color(TEXT_HI).size(46.0).strong());
                         ui.label(RichText::new("BPM").color(TEXT_LO).size(11.0));
                     },
                 );
@@ -161,11 +152,7 @@ impl eframe::App for HeartRateApp {
 
                 card(ui, |ui| {
                     let (rmssd_str, sdnn_str, pnn50_str) = match &self.hrv {
-                        Some(m) => (
-                            format!("{:.1}", m.rmssd),
-                            format!("{:.1}", m.sdnn),
-                            format!("{:.1}%", m.pnn50),
-                        ),
+                        Some(m) => (format!("{:.1}", m.rmssd), format!("{:.1}", m.sdnn), format!("{:.1}%", m.pnn50)),
                         None => ("—".into(), "—".into(), "—".into()),
                     };
                     ui.columns(3, |c| {

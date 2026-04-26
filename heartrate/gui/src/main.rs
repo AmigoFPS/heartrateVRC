@@ -81,38 +81,40 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>) {
                         let _ = tx.send(BleEvent::Connected(name));
                         scanning = false;
                     }
-                    Err(err) => match err {
-                        Error::DeviceNotFound
-                        | Error::NotConnected
-                        | Error::NoSuchCharacteristic
-                        | Error::TimedOut(_) => continue,
-                        other => {
-                            eprintln!("Connection error: {:?}", other);
-                            let _ = tx.send(BleEvent::FatalError(format!("{other}")));
-                            break;
+                    Err(err) => {
+                        let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+                        match err {
+                            Error::DeviceNotFound
+                            | Error::NotConnected
+                            | Error::NoSuchCharacteristic
+                            | Error::TimedOut(_) => continue,
+                            other => {
+                                eprintln!("Connection error: {:?}", other);
+                                let _ = tx.send(BleEvent::FatalError(format!("{other}")));
+                                break;
+                            }
                         }
-                    },
+                    }
                 }
             } else {
                 match host.get_bpm().await {
-                    Ok((bpm, rr_intervals)) => {
-                        hrv_analyzer.add_rr_intervals(&rr_intervals);
+                    Ok(data) => {
+                        hrv_analyzer.add_rr_intervals(&data.intervals);
                         let hrv = hrv_analyzer.compute();
 
-                        let _ = sender.send_bpm(
-                            bpm,
-                            settings.float_addresses(),
-                            settings.int_addresses(),
-                        );
+                        let _ = sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses());
 
                         if let Some(ref m) = hrv {
                             let _ = sender.send_hrv(m, settings.hrv_addresses());
                         }
 
-                        let _ = tx.send(BleEvent::Data { bpm, hrv });
+                        let _ = tx.send(BleEvent::Data { bpm: data.bpm, hrv });
                     }
                     Err(err) => {
                         eprintln!("Get BPM error: {:?}", err);
+
+                        let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+
                         match err {
                             Error::DeviceNotFound | Error::NotConnected | Error::TimedOut(_) => {
                                 let _ = tx.send(BleEvent::Disconnected);

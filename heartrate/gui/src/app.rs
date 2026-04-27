@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
-use eframe::egui::{self, Color32, CornerRadius, RichText, Stroke, Vec2};
+use eframe::egui::{self, Color32, CornerRadius, RichText, Sense, Stroke, Vec2};
 use egui_plot::{Line, Plot};
 
-use crate::BleEvent;
+use crate::{BleEvent, GuiCommand};
 use heartrate_core::hrv::HrvMetrics;
 
 const BG: Color32 = Color32::from_rgb(13, 13, 23);
@@ -19,9 +19,14 @@ const TEXT_LO: Color32 = Color32::from_rgb(110, 110, 145);
 const GREEN: Color32 = Color32::from_rgb(74, 186, 122);
 const AMBER: Color32 = Color32::from_rgb(212, 168, 67);
 const RED: Color32 = Color32::from_rgb(195, 65, 65);
+const WATER: Color32 = Color32::from_rgb(77, 145, 214);
+const RECHARGE: Color32 = Color32::from_rgb(140, 106, 219);
 
 const MAX_PTS: usize = 600;
 const VIEW_SEC: f64 = 60.0;
+const RESET_HOLD_SECS: f32 = 3.0;
+const RESET_SETTLE_SECS: f32 = 3.0;
+const RESET_BUTTON_COOLDOWN_SECS: f32 = 11.0;
 
 enum Status {
     Scanning,
@@ -31,6 +36,7 @@ enum Status {
 
 pub struct HeartRateApp {
     rx: Receiver<BleEvent>,
+    tx_cmd: Sender<GuiCommand>,
     t0: Instant,
     status: Status,
     bpm: i32,
@@ -38,13 +44,17 @@ pub struct HeartRateApp {
     bpm_hist: VecDeque<[f64; 2]>,
     rmssd_hist: VecDeque<[f64; 2]>,
     last_data_t: f64,
+    reset_fill_started: Option<Instant>,
+    reset_suppress_until: Option<Instant>,
+    reset_button_cooldown_until: Option<Instant>,
 }
 
 impl HeartRateApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, rx: Receiver<BleEvent>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, rx: Receiver<BleEvent>, tx_cmd: Sender<GuiCommand>) -> Self {
         apply_theme(&cc.egui_ctx);
         Self {
             rx,
+            tx_cmd,
             t0: Instant::now(),
             status: Status::Scanning,
             bpm: 0,
@@ -52,6 +62,9 @@ impl HeartRateApp {
             bpm_hist: VecDeque::with_capacity(MAX_PTS),
             rmssd_hist: VecDeque::with_capacity(MAX_PTS),
             last_data_t: 0.0,
+            reset_fill_started: None,
+            reset_suppress_until: None,
+            reset_button_cooldown_until: None,
         }
     }
 
@@ -76,10 +89,12 @@ impl HeartRateApp {
                     self.bpm = bpm;
                     self.last_data_t = t;
                     self.bpm_hist.push_back([t, bpm as f64]);
-                    if let Some(ref m) = hrv {
+                    let suppress_hrv = self.reset_suppress_until.is_some_and(|until| Instant::now() < until);
+                    let shown_hrv = if suppress_hrv { None } else { hrv };
+                    if let Some(ref m) = shown_hrv {
                         self.rmssd_hist.push_back([t, m.rmssd as f64]);
                     }
-                    self.hrv = hrv;
+                    self.hrv = shown_hrv;
                     while self.bpm_hist.len() > MAX_PTS {
                         self.bpm_hist.pop_front();
                     }
@@ -90,6 +105,13 @@ impl HeartRateApp {
                 BleEvent::FatalError(msg) => self.status = Status::Error(msg),
             }
         }
+    }
+
+    fn on_hrv_reset(&mut self) {
+        self.hrv = None;
+        self.rmssd_hist.clear();
+        self.reset_suppress_until = Some(Instant::now() + Duration::from_secs_f32(RESET_SETTLE_SECS));
+        self.reset_button_cooldown_until = Some(Instant::now() + Duration::from_secs_f32(RESET_BUTTON_COOLDOWN_SECS));
     }
 }
 
@@ -175,6 +197,82 @@ impl eframe::App for HeartRateApp {
                 let rmssd_pts: Vec<[f64; 2]> = self.rmssd_hist.iter().copied().collect();
                 dark_plot(ui, "rmssd", plot_t, 110.0, 0.0, 120.0, |plot_ui| {
                     plot_ui.line(Line::new("RMSSD", egui_plot::PlotPoints::from(rmssd_pts)).color(TEAL).width(1.8));
+                });
+
+                ui.add_space(2.0);
+                card(ui, |ui| {
+                    ui.label(RichText::new("HRV Reset").color(TEXT_LO).size(10.0));
+                    ui.add_space(4.0);
+                    let width = ui.available_width();
+                    let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 36.0), Sense::click_and_drag());
+                    let cooldown_left = self
+                        .reset_button_cooldown_until
+                        .map(|until| (until - Instant::now()).as_secs_f32())
+                        .unwrap_or(0.0)
+                        .max(0.0);
+                    let is_in_cooldown = cooldown_left > 0.0;
+                    let recharge_progress = if is_in_cooldown {
+                        1.0 - (cooldown_left / RESET_BUTTON_COOLDOWN_SECS).clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    };
+                    let is_holding = response.hovered() && ui.input(|i| i.pointer.primary_down());
+                    if is_in_cooldown {
+                        self.reset_fill_started = None;
+                    } else if is_holding {
+                        if self.reset_fill_started.is_none() {
+                            self.reset_fill_started = Some(Instant::now());
+                        }
+                    } else {
+                        self.reset_fill_started = None;
+                    }
+
+                    let fill = if let Some(started) = self.reset_fill_started {
+                        (started.elapsed().as_secs_f32() / RESET_HOLD_SECS).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+
+                    if fill >= 1.0 {
+                        let _ = self.tx_cmd.send(GuiCommand::ResetHrv);
+                        self.on_hrv_reset();
+                        self.reset_fill_started = None;
+                    }
+
+                    let bg_rect = rect.shrink2(Vec2::new(1.0, 1.0));
+                    let fill_w = bg_rect.width() * fill;
+                    let fill_rect = egui::Rect::from_min_size(bg_rect.min, Vec2::new(fill_w, bg_rect.height()));
+
+                    let painter = ui.painter();
+                    let bg_color = if is_in_cooldown {
+                        Color32::from_rgb(34, 34, 54)
+                    } else {
+                        Color32::from_rgb(28, 28, 49)
+                    };
+                    painter.rect_filled(bg_rect, CornerRadius::same(8), bg_color);
+                    if fill > 0.0 {
+                        painter.rect_filled(fill_rect, CornerRadius::same(8), WATER);
+                    }
+                    if is_in_cooldown {
+                        let recharge_w = bg_rect.width() * recharge_progress;
+                        let recharge_rect =
+                            egui::Rect::from_min_size(bg_rect.min, Vec2::new(recharge_w, bg_rect.height()));
+                        painter.rect_filled(recharge_rect, CornerRadius::same(8), RECHARGE.linear_multiply(0.7));
+                    }
+                    painter.rect_stroke(bg_rect, CornerRadius::same(8), Stroke::new(1.0, CARD_STROKE), egui::StrokeKind::Outside);
+
+                    let label = if is_in_cooldown {
+                        format!("Recharging {:.1}s", cooldown_left)
+                    } else {
+                        "Reset HRV".to_owned()
+                    };
+                    painter.text(
+                        bg_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        &label,
+                        egui::TextStyle::Button.resolve(ui.style()),
+                        if is_in_cooldown { TEXT_LO } else { TEXT_HI },
+                    );
                 });
             });
 

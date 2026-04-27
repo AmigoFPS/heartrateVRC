@@ -3,6 +3,7 @@
 mod app;
 
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use btleplug::{Error, api::Peripheral};
 use eframe::egui;
@@ -12,6 +13,10 @@ use heartrate_core::{
     osc::OscSender,
     settings_manager::AppSettings,
 };
+
+pub enum GuiCommand {
+    ResetHrv,
+}
 
 pub enum BleEvent {
     Scanning,
@@ -23,27 +28,28 @@ pub enum BleEvent {
 
 fn main() -> eframe::Result {
     let (tx, rx) = mpsc::channel();
+    let (tx_cmd, rx_cmd) = mpsc::channel();
 
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-        rt.block_on(ble_worker(tx));
+        rt.block_on(ble_worker(tx, rx_cmd));
     });
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([320.0, 480.0])
-            .with_min_inner_size([320.0, 480.0]),
+            .with_inner_size([320.0, 560.0])
+            .with_min_inner_size([320.0, 560.0]),
         ..Default::default()
     };
 
     eframe::run_native(
         "HeartRate OSC",
         options,
-        Box::new(|cc| Ok(Box::new(app::HeartRateApp::new(cc, rx)))),
+        Box::new(|cc| Ok(Box::new(app::HeartRateApp::new(cc, rx, tx_cmd)))),
     )
 }
 
-async fn ble_worker(tx: mpsc::Sender<BleEvent>) {
+async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiCommand>) {
     let settings = match AppSettings::try_load_from_file("settings.json") {
         Ok(s) => s,
         Err(e) => {
@@ -64,6 +70,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>) {
 
         let sender = OscSender::new([127, 0, 0, 1], settings.send_port());
         let mut hrv_analyzer = HrvAnalyzer::new();
+        let mut hrv_reset_until: Option<Instant> = None;
         let mut scanning = true;
         let _ = tx.send(BleEvent::Scanning);
 
@@ -97,10 +104,24 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>) {
                     }
                 }
             } else {
+                while let Ok(cmd) = rx_cmd.try_recv() {
+                    match cmd {
+                        GuiCommand::ResetHrv => {
+                            hrv_analyzer.reset();
+                            hrv_reset_until = Some(Instant::now() + Duration::from_secs(3));
+                        }
+                    }
+                }
+
                 match host.get_bpm().await {
                     Ok(data) => {
-                        hrv_analyzer.add_rr_intervals(&data.intervals);
-                        let hrv = hrv_analyzer.compute();
+                        let now = Instant::now();
+                        let suppress_hrv = hrv_reset_until.is_some_and(|until| now < until);
+                        if !suppress_hrv {
+                            hrv_reset_until = None;
+                            hrv_analyzer.add_rr_intervals(&data.intervals);
+                        }
+                        let hrv = if suppress_hrv { None } else { hrv_analyzer.compute() };
 
                         let _ = sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses());
 

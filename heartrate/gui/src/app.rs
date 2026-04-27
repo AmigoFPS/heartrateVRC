@@ -94,12 +94,15 @@ impl HeartRateApp {
 }
 
 impl eframe::App for HeartRateApp {
+    fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {}
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll();
         let t = self.now();
 
         let plot_t = if self.last_data_t > 0.0 { self.last_data_t } else { t };
 
+        #[allow(deprecated)]
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(BG).inner_margin(10.0))
             .show(ctx, |ui| {
@@ -165,13 +168,13 @@ impl eframe::App for HeartRateApp {
                 ui.label(RichText::new("Heart Rate").color(TEXT_LO).size(10.0));
                 let bpm_pts: Vec<[f64; 2]> = self.bpm_hist.iter().copied().collect();
                 dark_plot(ui, "bpm", plot_t, 110.0, 40.0, 180.0, |plot_ui| {
-                    plot_ui.line(Line::new(bpm_pts).color(HEART).width(1.8));
+                    plot_ui.line(Line::new("BPM", egui_plot::PlotPoints::from(bpm_pts)).color(HEART).width(1.8));
                 });
 
                 ui.label(RichText::new("HRV · RMSSD").color(TEXT_LO).size(10.0));
                 let rmssd_pts: Vec<[f64; 2]> = self.rmssd_hist.iter().copied().collect();
                 dark_plot(ui, "rmssd", plot_t, 110.0, 0.0, 120.0, |plot_ui| {
-                    plot_ui.line(Line::new(rmssd_pts).color(TEAL).width(1.8));
+                    plot_ui.line(Line::new("RMSSD", egui_plot::PlotPoints::from(rmssd_pts)).color(TEAL).width(1.8));
                 });
             });
 
@@ -220,7 +223,7 @@ fn dark_plot(
 }
 
 fn apply_theme(ctx: &egui::Context) {
-    let mut style = (*ctx.style()).clone();
+    let mut style = (*ctx.global_style()).clone();
     style.visuals.dark_mode = true;
     style.visuals.panel_fill = BG;
     style.visuals.window_fill = BG;
@@ -230,5 +233,5 @@ fn apply_theme(ctx: &egui::Context) {
     style.visuals.faint_bg_color = Color32::from_rgb(20, 20, 35);
     style.visuals.window_corner_radius = CornerRadius::same(10);
     style.visuals.menu_corner_radius = CornerRadius::same(6);
-    ctx.set_style(style);
+    ctx.set_global_style(style);
 }

@@ -43,7 +43,7 @@ impl LayoutMode {
     fn size(self) -> Vec2 {
         match self {
             LayoutMode::Full => Vec2::new(320.0, 520.0),
-            LayoutMode::Lite => Vec2::new(300.0, 200.0),
+            LayoutMode::Lite => Vec2::new(340.0, 210.0),
             LayoutMode::Compact => Vec2::new(200.0, 200.0),
         }
     }
@@ -197,7 +197,7 @@ impl HeartRateApp {
         ui.horizontal(|ui| {
             ui.label(RichText::new("Heart Rate").color(TEXT_LO).size(10.0));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if chevron_btn(ui, "˄").clicked() {
+                if chevron_btn(ui, ChevronDir::Up).clicked() {
                     request_lite = true;
                 }
             });
@@ -222,48 +222,57 @@ impl HeartRateApp {
 
     fn render_lite(&mut self, ui: &mut egui::Ui, t: f64) -> Option<LayoutMode> {
         let mut next: Option<LayoutMode> = None;
-        let avail_h = ui.available_height();
 
-        ui.horizontal_top(|ui| {
-            let left_w = 175.0;
+        ui.horizontal(|ui| {
+            self.render_reset_icon(ui);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if chevron_btn(ui, ChevronDir::Left).clicked() {
+                    next = Some(LayoutMode::Compact);
+                }
+            });
+        });
+
+        let middle_h = (ui.available_height() - 26.0).max(80.0);
+        let bpm_block_h = 94.0;
+        let card_h = 100.0;
+        let pad_bpm = ((middle_h - bpm_block_h) / 2.0).max(0.0);
+        let pad_card = ((middle_h - card_h) / 2.0).max(0.0);
+
+        ui.horizontal(|ui| {
+            let left_w = ui.available_width() * 0.42;
             ui.allocate_ui_with_layout(
-                Vec2::new(left_w, avail_h),
+                Vec2::new(left_w, middle_h),
                 egui::Layout::top_down(egui::Align::Center),
                 |ui| {
-                    ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                        self.render_reset_icon(ui);
-                    });
+                    ui.add_space(pad_bpm);
                     self.render_bpm_block(ui, t);
-                    self.render_status_dot(ui);
                 },
             );
-
-            ui.add_space(4.0);
 
             ui.allocate_ui_with_layout(
-                Vec2::new(ui.available_width(), avail_h),
+                Vec2::new(ui.available_width(), middle_h),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                        if chevron_btn(ui, "‹").clicked() {
-                            next = Some(LayoutMode::Compact);
-                        }
-                    });
-                    self.render_hrv_card_vertical(ui);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::BOTTOM), |ui| {
-                        if chevron_btn(ui, "˅").clicked() {
-                            next = Some(LayoutMode::Full);
-                        }
-                    });
+                    ui.add_space(pad_card);
+                    self.render_hrv_card_vertical_wide(ui);
                 },
             );
+        });
+
+        ui.horizontal(|ui| {
+            self.render_status_dot(ui);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if chevron_btn(ui, ChevronDir::Down).clicked() {
+                    next = Some(LayoutMode::Full);
+                }
+            });
         });
 
         next
     }
 
     fn render_compact(&mut self, ui: &mut egui::Ui, t: f64) -> Option<LayoutMode> {
-        let next = self.render_top_bar(ui, Some(("›", LayoutMode::Lite)));
+        let next = self.render_top_bar(ui, Some((ChevronDir::Right, LayoutMode::Lite)));
         self.render_bpm_block(ui, t);
         self.render_status_dot(ui);
         next
@@ -272,14 +281,14 @@ impl HeartRateApp {
     fn render_top_bar(
         &mut self,
         ui: &mut egui::Ui,
-        right_chevron: Option<(&str, LayoutMode)>,
+        right_chevron: Option<(ChevronDir, LayoutMode)>,
     ) -> Option<LayoutMode> {
         let mut next: Option<LayoutMode> = None;
         ui.horizontal(|ui| {
             self.render_reset_icon(ui);
-            if let Some((glyph, target)) = right_chevron {
+            if let Some((dir, target)) = right_chevron {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if chevron_btn(ui, glyph).clicked() {
+                    if chevron_btn(ui, dir).clicked() {
                         next = Some(target);
                     }
                 });
@@ -346,12 +355,15 @@ impl HeartRateApp {
         });
     }
 
-    fn render_hrv_card_vertical(&self, ui: &mut egui::Ui) {
+    fn render_hrv_card_vertical_wide(&self, ui: &mut egui::Ui) {
         card(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             let (rmssd_str, sdnn_str, pnn50_str) = self.hrv_strings();
-            metric_row(ui, "RMSSD", &rmssd_str, TEAL);
-            metric_row(ui, "SDNN", &sdnn_str, TEAL);
-            metric_row(ui, "pNN50", &pnn50_str, PURPLE);
+            metric_row_large(ui, "RMSSD", &rmssd_str, TEAL);
+            ui.add_space(2.0);
+            metric_row_large(ui, "SDNN", &sdnn_str, TEAL);
+            ui.add_space(2.0);
+            metric_row_large(ui, "pNN50", &pnn50_str, PURPLE);
         });
     }
 
@@ -417,14 +429,15 @@ impl HeartRateApp {
         painter.rect_filled(rect, radius, bg_color);
 
         if fill > 0.0 {
-            let fill_w = rect.width() * fill;
-            let fill_rect = egui::Rect::from_min_size(rect.min, Vec2::new(fill_w, rect.height()));
-            painter.rect_filled(fill_rect, radius, WATER);
+            let clip = egui::Rect::from_min_size(rect.min, Vec2::new(rect.width() * fill, rect.height()));
+            painter.with_clip_rect(clip).rect_filled(rect, radius, WATER);
         }
         if is_in_cooldown {
-            let recharge_w = rect.width() * recharge_progress;
-            let recharge_rect = egui::Rect::from_min_size(rect.min, Vec2::new(recharge_w, rect.height()));
-            painter.rect_filled(recharge_rect, radius, RECHARGE.linear_multiply(0.7));
+            let clip = egui::Rect::from_min_size(
+                rect.min,
+                Vec2::new(rect.width() * recharge_progress, rect.height()),
+            );
+            painter.with_clip_rect(clip).rect_filled(rect, radius, RECHARGE.linear_multiply(0.7));
         }
         painter.rect_stroke(rect, radius, Stroke::new(1.0, CARD_STROKE), egui::StrokeKind::Outside);
 
@@ -449,7 +462,14 @@ impl HeartRateApp {
     }
 }
 
-fn chevron_btn(ui: &mut egui::Ui, glyph: &str) -> egui::Response {
+enum ChevronDir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+fn chevron_btn(ui: &mut egui::Ui, dir: ChevronDir) -> egui::Response {
     let size = Vec2::new(ICON_SIZE, ICON_SIZE);
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     let painter = ui.painter();
@@ -457,13 +477,35 @@ fn chevron_btn(ui: &mut egui::Ui, glyph: &str) -> egui::Response {
     let radius = CornerRadius::same(6);
     painter.rect_filled(rect, radius, bg);
     painter.rect_stroke(rect, radius, Stroke::new(1.0, CARD_STROKE), egui::StrokeKind::Outside);
-    painter.text(
-        rect.center(),
-        egui::Align2::CENTER_CENTER,
-        glyph,
-        FontId::proportional(15.0),
-        TEXT_HI,
-    );
+
+    let c = rect.center();
+    let s = 4.5_f32;
+    let stroke = Stroke::new(1.6, TEXT_HI);
+    let (tip, wing_a, wing_b) = match dir {
+        ChevronDir::Up => (
+            egui::pos2(c.x, c.y - s),
+            egui::pos2(c.x - s, c.y + s * 0.5),
+            egui::pos2(c.x + s, c.y + s * 0.5),
+        ),
+        ChevronDir::Down => (
+            egui::pos2(c.x, c.y + s),
+            egui::pos2(c.x - s, c.y - s * 0.5),
+            egui::pos2(c.x + s, c.y - s * 0.5),
+        ),
+        ChevronDir::Left => (
+            egui::pos2(c.x - s, c.y),
+            egui::pos2(c.x + s * 0.5, c.y - s),
+            egui::pos2(c.x + s * 0.5, c.y + s),
+        ),
+        ChevronDir::Right => (
+            egui::pos2(c.x + s, c.y),
+            egui::pos2(c.x - s * 0.5, c.y - s),
+            egui::pos2(c.x - s * 0.5, c.y + s),
+        ),
+    };
+    painter.line_segment([wing_a, tip], stroke);
+    painter.line_segment([tip, wing_b], stroke);
+
     if response.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
@@ -486,11 +528,11 @@ fn metric(ui: &mut egui::Ui, label: &str, value: &str, color: Color32) {
     });
 }
 
-fn metric_row(ui: &mut egui::Ui, label: &str, value: &str, color: Color32) {
+fn metric_row_large(ui: &mut egui::Ui, label: &str, value: &str, color: Color32) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new(label).color(TEXT_LO).size(11.0));
+        ui.label(RichText::new(label).color(TEXT_LO).size(10.0));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(RichText::new(value).color(color).size(15.0).strong());
+            ui.label(RichText::new(value).color(color).size(17.0).strong());
         });
     });
 }

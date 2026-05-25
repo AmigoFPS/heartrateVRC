@@ -2,6 +2,7 @@
 
 mod app;
 
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -10,12 +11,14 @@ use eframe::egui;
 use heartrate_core::{
     heartrate_device::HeartrateDevice,
     hrv::{HrvAnalyzer, HrvMetrics},
+    logger::{self, SessionLogger},
     osc::OscSender,
     settings_manager::AppSettings,
 };
 
 pub enum GuiCommand {
     ResetHrv,
+    SaveLog,
 }
 
 pub enum BleEvent {
@@ -24,6 +27,8 @@ pub enum BleEvent {
     Disconnected,
     Data { bpm: i32, hrv: Option<HrvMetrics> },
     FatalError(String),
+    LogSaved(PathBuf),
+    LogError(String),
 }
 
 fn main() -> eframe::Result {
@@ -58,6 +63,8 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
         }
     };
 
+    let log_dir = logger::default_log_dir();
+
     loop {
         let mut host = match HeartrateDevice::new().await {
             Ok(h) => h,
@@ -72,6 +79,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
         let mut hrv_analyzer = HrvAnalyzer::new();
         let mut hrv_reset_until: Option<Instant> = None;
         let mut scanning = true;
+        let mut session_logger: Option<SessionLogger> = None;
         let _ = tx.send(BleEvent::Scanning);
 
         loop {
@@ -85,6 +93,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                             .and_then(|p| p.local_name)
                             .unwrap_or_default();
                         hrv_analyzer = HrvAnalyzer::new();
+                        session_logger = Some(SessionLogger::new(name.clone()));
                         let _ = tx.send(BleEvent::Connected(name));
                         scanning = false;
                     }
@@ -110,6 +119,20 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                             hrv_analyzer.reset();
                             hrv_reset_until = Some(Instant::now() + Duration::from_secs(3));
                         }
+                        GuiCommand::SaveLog => {
+                            if let Some(ref logger) = session_logger {
+                                if !logger.is_empty() {
+                                    match logger.save(&log_dir) {
+                                        Ok(path) => {
+                                            let _ = tx.send(BleEvent::LogSaved(path));
+                                        }
+                                        Err(e) => {
+                                            let _ = tx.send(BleEvent::LogError(format!("{e}")));
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -129,6 +152,10 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                             let _ = sender.send_hrv(m, settings.hrv_addresses());
                         }
 
+                        if let Some(ref mut logger) = session_logger {
+                            logger.record(data.bpm.max(0) as u16, hrv.as_ref());
+                        }
+
                         let _ = tx.send(BleEvent::Data { bpm: data.bpm, hrv });
                     }
                     Err(err) => {
@@ -138,12 +165,18 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
 
                         match err {
                             Error::DeviceNotFound | Error::NotConnected | Error::TimedOut(_) => {
+                                if let Some(logger) = session_logger.take() {
+                                    auto_save(&logger, &log_dir, &tx);
+                                }
                                 let _ = tx.send(BleEvent::Disconnected);
                                 scanning = true;
                                 continue;
                             }
                             other => {
                                 eprintln!("Unrecoverable error: {:?}", other);
+                                if let Some(logger) = session_logger.take() {
+                                    auto_save(&logger, &log_dir, &tx);
+                                }
                                 let _ = tx.send(BleEvent::FatalError(format!("{other}")));
                                 break;
                             }
@@ -155,5 +188,21 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
 
         let _ = host.disconnect().await;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+}
+
+const AUTO_SAVE_MIN_SAMPLES: usize = 30;
+
+fn auto_save(logger: &SessionLogger, log_dir: &std::path::Path, tx: &mpsc::Sender<BleEvent>) {
+    if logger.sample_count() < AUTO_SAVE_MIN_SAMPLES {
+        return;
+    }
+    match logger.save(log_dir) {
+        Ok(path) => {
+            let _ = tx.send(BleEvent::LogSaved(path));
+        }
+        Err(e) => {
+            let _ = tx.send(BleEvent::LogError(format!("{e}")));
+        }
     }
 }

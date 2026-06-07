@@ -1,7 +1,36 @@
-use std::io;
+pub mod app;
+pub mod event;
+pub mod tui;
+pub mod ui;
+pub mod update;
 
-use heartrate_tui::app::App;
+use color_eyre::Result;
+use ratatui::{Terminal, prelude::CrosstermBackend};
 
-fn main() -> io::Result<()> {
-    ratatui::run(|terminal| App::default().run(terminal))
+use crate::{
+    app::App,
+    event::{Event, EventHandler},
+    tui::Tui,
+};
+
+fn main() -> Result<()> {
+    let mut app = App::new();
+    let backend = CrosstermBackend::new(std::io::stderr());
+    let terminal = Terminal::new(backend)?;
+    let events = EventHandler::new(250);
+    let mut tui = Tui::new(terminal, events);
+    tui.enter()?;
+
+    while !app.should_quit() {
+        tui.draw(&mut app)?;
+        match tui.events.next()? {
+            Event::Tick => {}
+            Event::Key(key_event) => update::update(&mut app, key_event),
+            Event::Mouse(_) => {}
+            Event::Resize(_, _) => {}
+        };
+    }
+
+    tui.exit()?;
+    Ok(())
 }

@@ -1,6 +1,8 @@
-#[derive(Default, Debug, Clone)]
+use crate::page::Page;
+
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct App {
-    counter: u8,
+    current_page: Page,
     should_quit: bool,
 }
 
@@ -9,8 +11,12 @@ impl App {
         Self::default()
     }
 
-    pub fn counter(&self) -> u8 {
-        self.counter
+    pub fn current_page(&self) -> Page {
+        self.current_page
+    }
+
+    pub fn set_current_page(&mut self, page: Page) {
+        self.current_page = page;
     }
 
     pub fn should_quit(&self) -> bool {
@@ -19,17 +25,5 @@ impl App {
 
     pub(crate) fn quit(&mut self) {
         self.should_quit = true
-    }
-
-    pub(crate) fn increment_counter(&mut self) {
-        if let Some(res) = self.counter.checked_add(1) {
-            self.counter = res
-        }
-    }
-
-    pub(crate) fn decrement_counter(&mut self) {
-        if let Some(res) = self.counter.checked_sub(1) {
-            self.counter = res
-        }
     }
 }

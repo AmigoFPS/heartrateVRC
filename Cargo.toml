@@ -29,16 +29,9 @@ ratatui = { version = "0.30.1", features = ["serde"] }
 crossterm = "0.29.0"
 color-eyre = "0.6.5"
 
-[profile.release]
-debug = "limited"
-strip = false
-
 [profile.distribution]
 inherits = "release"
 lto = true
-serde_json = "1.0.150"
-eframe = "0.34.2"
-egui_plot = "0.35.0"
 
 [profile.release]
 debug = false

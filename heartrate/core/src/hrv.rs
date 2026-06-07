@@ -32,6 +32,10 @@ impl HrvAnalyzer {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.rr_ms.clear();
+    }
+
     pub fn compute(&self) -> Option<HrvMetrics> {
         let n = self.rr_ms.len();
         if n < MIN_INTERVALS {

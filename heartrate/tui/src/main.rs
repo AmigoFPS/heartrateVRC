@@ -25,8 +25,8 @@ fn main() -> Result<()> {
         tui.draw(&mut app)?;
         match tui.events.next()? {
             Event::Tick => {}
-            Event::Key(key_event) => update::update(&mut app, key_event),
-            Event::Mouse(_) => {}
+            Event::Key(key_event) => update::update_key_event(&mut app, key_event),
+            Event::Mouse(mouse_event) => update::update_mouse_event(&mut app, mouse_event),
             Event::Resize(_, _) => {}
         };
     }

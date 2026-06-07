@@ -1,0 +1,15 @@
+{
+  "send_port": 9000,
+  "correction": 20,
+  "float_addresses": [
+    "/avatar/parameters/Heartrate_OSC",
+    "/avatar/parameters/Heartrate2",
+    "/avatar/parameters/HRPercent"
+  ],
+  "int_addresses": ["/avatar/parameters/HeartrateInt", "/avatar/parameters/HR"],
+  "hrv_addresses": [
+    "/avatar/parameters/HRV_RMSSD",
+    "/avatar/parameters/HRV_SDNN",
+    "/avatar/parameters/HRV_pNN50"
+  ]
+}

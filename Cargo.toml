@@ -28,6 +28,7 @@ egui_plot = "0.35.0"
 ratatui = { version = "0.30.1", features = ["serde"] }
 crossterm = "0.29.0"
 color-eyre = "0.6.5"
+log = { version = "0.4.32", features = ["serde"] }
 
 [profile.distribution]
 inherits = "release"

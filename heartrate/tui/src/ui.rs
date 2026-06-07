@@ -2,12 +2,14 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
-    symbols,
-    text::Line,
-    widgets::{Axis, Block, BorderType, Borders, Chart, Dataset, GraphType, Padding, Paragraph, Tabs},
+    widgets::{Block, BorderType, Borders, Padding, Paragraph, Tabs},
 };
 
-use crate::{app::App, page::Page};
+use crate::{
+    app::App,
+    logger::LocalLogger,
+    page::{Page, draw_metric_chart},
+};
 
 pub fn render(app: &mut App, frame: &mut Frame) {
     let main_block = Block::new()
@@ -53,63 +55,34 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     }
 }
 
-fn render_heartrate_page(app: &mut App, frame: &mut Frame, area: Rect) {
-    let dataset = Dataset::default()
-        .marker(symbols::Marker::Braille)
-        .graph_type(GraphType::Line)
-        .style(Style::default().fg(Color::Red))
-        .data(&app.heartrate_data);
+pub fn render_heartrate_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
+    draw_metric_chart(frame, area, &app.heartrate_data, Color::Red, "BPM", 60.0, 120.0);
+}
 
-    let min_x = app.heartrate_data.first().map(|d| d.0).unwrap_or(0.0);
-    let max_x = app.heartrate_data.last().map(|d| d.0).unwrap_or(100.0);
+pub fn render_rmssd_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
+    draw_metric_chart(frame, area, &app.rmssd_data, Color::Cyan, "ms", 10.0, 100.0);
+}
 
-    let min_y = app
-        .heartrate_data
-        .iter()
-        .map(|d| d.1)
-        .fold(f64::INFINITY, f64::min)
-        .min(60.0);
+pub fn render_sdnn_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
+    draw_metric_chart(frame, area, &app.sdnn_data, Color::Green, "ms", 20.0, 150.0);
+}
 
-    let max_y = app
-        .heartrate_data
-        .iter()
-        .map(|d| d.1)
-        .fold(f64::NEG_INFINITY, f64::max)
-        .max(120.0);
+pub fn render_pnn50_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
+    draw_metric_chart(frame, area, &app.pnn50_data, Color::Yellow, "%", 0.0, 100.0);
+}
 
-    let x_axis = Axis::default()
+fn render_logs_page(_app: &mut App, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+    let recent_logs = LocalLogger::get_last_lines(20);
+
+    let log_text = if recent_logs.is_empty() {
+        "No log entries recorded yet.".to_string()
+    } else {
+        recent_logs.join("\n")
+    };
+
+    let logs_paragraph = Paragraph::new(log_text)
         .style(Style::default().fg(Color::Gray))
-        .bounds([min_x, max_x]);
+        .alignment(Alignment::Left);
 
-    let y_axis = Axis::default()
-        .style(Style::default().fg(Color::Gray))
-        .bounds([min_y - 5.0, max_y + 5.0])
-        .labels(vec![
-            Line::from(format!("{:.0}", min_y)),
-            Line::from(format!("{:.0}", (min_y + max_y) / 2.0)),
-            Line::from(format!("{:.0}", max_y)),
-        ]);
-
-    let chart = Chart::new(vec![dataset]).x_axis(x_axis).y_axis(y_axis);
-    frame.render_widget(chart, area);
-}
-
-fn render_rmssd_page(_app: &mut App, frame: &mut Frame, area: ratatui::prelude::Rect) {
-    let text = "RMSSD (Short-term HRV)\n\nCalculates root mean square of successive differences.";
-    frame.render_widget(Paragraph::new(text).alignment(Alignment::Center).fg(Color::Cyan), area);
-}
-
-fn render_sdnn_page(_app: &mut App, frame: &mut Frame, area: ratatui::prelude::Rect) {
-    let text = "SDNN (Overall HRV)\n\nStandard deviation of NN intervals.";
-    frame.render_widget(Paragraph::new(text).alignment(Alignment::Center).fg(Color::Green), area);
-}
-
-fn render_pnn50_page(_app: &mut App, frame: &mut Frame, area: ratatui::prelude::Rect) {
-    let text = "pNN50\n\nPercentage of successive NN intervals that differ by more than 50ms.";
-    frame.render_widget(Paragraph::new(text).alignment(Alignment::Center).fg(Color::Yellow), area);
-}
-
-fn render_logs_page(_app: &mut App, frame: &mut Frame, area: ratatui::prelude::Rect) {
-    let text = "Data Logs\n\n[Timestamped historical heartrate stream]";
-    frame.render_widget(Paragraph::new(text).alignment(Alignment::Center).fg(Color::Gray), area);
+    frame.render_widget(logs_paragraph, area);
 }

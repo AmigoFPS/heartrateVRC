@@ -1,5 +1,6 @@
 use ratatui::{
     layout::Rect,
+    macros::ratatui_core,
     style::{Color, Style, Stylize},
     symbols,
     text::Line,
@@ -28,6 +29,18 @@ impl From<Page> for usize {
     }
 }
 
+impl From<Page> for ratatui_core::style::Color {
+    fn from(value: Page) -> Self {
+        match value {
+            Page::Heartrate => Color::LightRed,
+            Page::Rmssd => Color::LightCyan,
+            Page::Sdnn => Color::LightGreen,
+            Page::Pnn50 => Color::LightYellow,
+            Page::Logs => Color::White,
+        }
+    }
+}
+
 impl From<Page> for Option<usize> {
     fn from(value: Page) -> Self {
         match value {
@@ -50,6 +63,7 @@ pub fn draw_metric_chart(
     fallback_max_y: f64,
 ) {
     let dataset = Dataset::default()
+        .name(format!("{:.2} {}", data.last().unwrap_or(&(0.0, 0.0)).1, y_axis_title))
         .marker(symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(line_color))

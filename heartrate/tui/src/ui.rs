@@ -40,8 +40,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 .border_style(Style::default().fg(Color::DarkGray)),
         )
         .select(app.current_page)
-        .style(Style::default().fg(Color::LightRed).bg(Color::Black))
-        .highlight_style(Style::default().fg(Color::Black).bg(Color::LightRed))
+        .style(Style::default().fg(app.current_page.into()).bg(Color::Black))
+        .highlight_style(Style::default().fg(Color::Black).bg(app.current_page.into()))
         .divider("|");
 
     frame.render_widget(tabs, chunks[0]);
@@ -56,19 +56,19 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 }
 
 pub fn render_heartrate_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
-    draw_metric_chart(frame, area, &app.heartrate_data, Color::Red, "BPM", 60.0, 120.0);
+    draw_metric_chart(frame, area, &app.heartrate_data, app.current_page.into(), "BPM", 60.0, 120.0);
 }
 
 pub fn render_rmssd_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
-    draw_metric_chart(frame, area, &app.rmssd_data, Color::Cyan, "ms", 10.0, 100.0);
+    draw_metric_chart(frame, area, &app.rmssd_data, app.current_page.into(), "ms", 10.0, 100.0);
 }
 
 pub fn render_sdnn_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
-    draw_metric_chart(frame, area, &app.sdnn_data, Color::Green, "ms", 20.0, 150.0);
+    draw_metric_chart(frame, area, &app.sdnn_data, app.current_page.into(), "ms", 20.0, 150.0);
 }
 
 pub fn render_pnn50_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) {
-    draw_metric_chart(frame, area, &app.pnn50_data, Color::Yellow, "%", 0.0, 100.0);
+    draw_metric_chart(frame, area, &app.pnn50_data, app.current_page.into(), "%", 0.0, 100.0);
 }
 
 fn render_logs_page(_app: &mut App, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {

@@ -329,13 +329,21 @@ impl HeartRateApp {
 
         let bpm_pts: Vec<[f64; 2]> = self.bpm_hist.iter().copied().collect();
         dark_plot(ui, "bpm", plot_t, 110.0, 40.0, 180.0, |plot_ui| {
-            plot_ui.line(Line::new("BPM", egui_plot::PlotPoints::from(bpm_pts)).color(HEART).width(1.8));
+            plot_ui.line(
+                Line::new("BPM", egui_plot::PlotPoints::from(bpm_pts))
+                    .color(HEART)
+                    .width(1.8),
+            );
         });
 
         ui.label(RichText::new("HRV · RMSSD").color(TEXT_LO).size(10.0));
         let rmssd_pts: Vec<[f64; 2]> = self.rmssd_hist.iter().copied().collect();
         dark_plot(ui, "rmssd", plot_t, 110.0, 0.0, 120.0, |plot_ui| {
-            plot_ui.line(Line::new("RMSSD", egui_plot::PlotPoints::from(rmssd_pts)).color(TEAL).width(1.8));
+            plot_ui.line(
+                Line::new("RMSSD", egui_plot::PlotPoints::from(rmssd_pts))
+                    .color(TEAL)
+                    .width(1.8),
+            );
         });
 
         next
@@ -502,11 +510,7 @@ impl HeartRateApp {
 
     fn hrv_strings(&self) -> (String, String, String) {
         match &self.hrv {
-            Some(m) => (
-                format!("{:.1}", m.rmssd),
-                format!("{:.1}", m.sdnn),
-                format!("{:.1}%", m.pnn50),
-            ),
+            Some(m) => (format!("{:.1}", m.rmssd), format!("{:.1}", m.sdnn), format!("{:.1}%", m.pnn50)),
             None => ("—".into(), "—".into(), "—".into()),
         }
     }
@@ -566,11 +570,10 @@ impl HeartRateApp {
             painter.with_clip_rect(clip).rect_filled(rect, radius, WATER);
         }
         if is_in_cooldown {
-            let clip = egui::Rect::from_min_size(
-                rect.min,
-                Vec2::new(rect.width() * recharge_progress, rect.height()),
-            );
-            painter.with_clip_rect(clip).rect_filled(rect, radius, RECHARGE.linear_multiply(0.7));
+            let clip = egui::Rect::from_min_size(rect.min, Vec2::new(rect.width() * recharge_progress, rect.height()));
+            painter
+                .with_clip_rect(clip)
+                .rect_filled(rect, radius, RECHARGE.linear_multiply(0.7));
         }
         painter.rect_stroke(rect, radius, Stroke::new(1.0, CARD_STROKE), egui::StrokeKind::Outside);
 
@@ -680,11 +683,7 @@ impl HeartRateApp {
     fn render_logs_list(&mut self, ui: &mut egui::Ui) {
         let live_active = self.live_logger.is_some();
         let total = self.logs.files.len() + if live_active { 1 } else { 0 };
-        ui.label(
-            RichText::new(format!("{} session(s)", total))
-                .color(TEXT_LO)
-                .size(10.0),
-        );
+        ui.label(RichText::new(format!("{} session(s)", total)).color(TEXT_LO).size(10.0));
         ui.add_space(4.0);
 
         if let Some(err) = &self.logs.load_error {
@@ -779,17 +778,9 @@ impl HeartRateApp {
             if let Some(err) = &self.logs.load_error {
                 ui.label(RichText::new(format!("Failed to load: {err}")).color(RED).size(11.0));
             } else if matches!(self.logs.selected, SelectedLog::None) {
-                ui.label(
-                    RichText::new("Select a session on the left.")
-                        .color(TEXT_LO)
-                        .size(11.0),
-                );
+                ui.label(RichText::new("Select a session on the left.").color(TEXT_LO).size(11.0));
             } else {
-                ui.label(
-                    RichText::new("Waiting for first sample…")
-                        .color(TEXT_LO)
-                        .size(11.0),
-                );
+                ui.label(RichText::new("Waiting for first sample…").color(TEXT_LO).size(11.0));
             }
             return (delete_clicked, export_clicked, save_live_clicked);
         };
@@ -807,12 +798,7 @@ impl HeartRateApp {
                         let dot = Color32::from_rgba_unmultiplied(HEART.r(), HEART.g(), HEART.b(), alpha);
                         let (rect, _) = ui.allocate_exact_size(Vec2::new(10.0, 14.0), Sense::hover());
                         ui.painter().circle_filled(rect.center(), 4.0, dot);
-                        ui.label(
-                            RichText::new("Live session")
-                                .color(TEXT_HI)
-                                .size(13.0)
-                                .strong(),
-                        );
+                        ui.label(RichText::new("Live session").color(TEXT_HI).size(13.0).strong());
                     } else {
                         ui.label(
                             RichText::new(log.started_at_display())
@@ -835,18 +821,8 @@ impl HeartRateApp {
                     ui.label(RichText::new("Brief").color(TEXT_LO).size(10.0));
                     ui.columns(4, |c| {
                         metric(&mut c[0], "Duration", &logger::format_duration(log.duration_ms), TEAL);
-                        metric(
-                            &mut c[1],
-                            "Samples",
-                            &stats.brief.sample_count.to_string(),
-                            TEAL,
-                        );
-                        metric(
-                            &mut c[2],
-                            "Avg BPM",
-                            &format!("{:.0}", stats.brief.avg_bpm),
-                            HEART,
-                        );
+                        metric(&mut c[1], "Samples", &stats.brief.sample_count.to_string(), TEAL);
+                        metric(&mut c[2], "Avg BPM", &format!("{:.0}", stats.brief.avg_bpm), HEART);
                         metric(
                             &mut c[3],
                             "Min/Max",
@@ -905,10 +881,7 @@ impl HeartRateApp {
         match std::fs::remove_file(&path) {
             Ok(_) => {
                 self.show_toast(
-                    format!(
-                        "Deleted {}",
-                        path.file_name().and_then(|s| s.to_str()).unwrap_or("session")
-                    ),
+                    format!("Deleted {}", path.file_name().and_then(|s| s.to_str()).unwrap_or("session")),
                     false,
                 );
                 self.logs.selected = SelectedLog::None;
@@ -941,8 +914,7 @@ impl HeartRateApp {
                     .and_then(|s| s.to_str())
                     .unwrap_or("session.csv")
                     .to_owned();
-                self.logs.export_status =
-                    Some((Instant::now(), format!("Exported {name}"), false));
+                self.logs.export_status = Some((Instant::now(), format!("Exported {name}"), false));
             }
             Err(e) => {
                 self.logs.export_status = Some((Instant::now(), format!("Export failed: {e}"), true));
@@ -988,18 +960,8 @@ fn render_full_stats_card(ui: &mut egui::Ui, stats: &FullStats) {
     card(ui, |ui| {
         ui.label(RichText::new("BPM").color(TEXT_LO).size(10.0));
         ui.columns(3, |c| {
-            metric(
-                &mut c[0],
-                "Avg",
-                &format!("{:.1}", stats.brief.avg_bpm),
-                HEART,
-            );
-            metric(
-                &mut c[1],
-                "Std Dev",
-                &format!("{:.1}", stats.bpm_stddev),
-                HEART,
-            );
+            metric(&mut c[0], "Avg", &format!("{:.1}", stats.brief.avg_bpm), HEART);
+            metric(&mut c[1], "Std Dev", &format!("{:.1}", stats.bpm_stddev), HEART);
             metric(
                 &mut c[2],
                 "Range",
@@ -1011,24 +973,9 @@ fn render_full_stats_card(ui: &mut egui::Ui, stats: &FullStats) {
         ui.add_space(4.0);
         ui.label(RichText::new("HRV").color(TEXT_LO).size(10.0));
         ui.columns(3, |c| {
-            metric(
-                &mut c[0],
-                "RMSSD avg",
-                &fmt_opt(stats.rmssd_avg),
-                TEAL,
-            );
-            metric(
-                &mut c[1],
-                "SDNN avg",
-                &fmt_opt(stats.sdnn_avg),
-                TEAL,
-            );
-            metric(
-                &mut c[2],
-                "pNN50 avg",
-                &fmt_opt_pct(stats.pnn50_avg),
-                PURPLE,
-            );
+            metric(&mut c[0], "RMSSD avg", &fmt_opt(stats.rmssd_avg), TEAL);
+            metric(&mut c[1], "SDNN avg", &fmt_opt(stats.sdnn_avg), TEAL);
+            metric(&mut c[2], "pNN50 avg", &fmt_opt_pct(stats.pnn50_avg), PURPLE);
         });
         ui.columns(3, |c| {
             metric(
@@ -1037,12 +984,7 @@ fn render_full_stats_card(ui: &mut egui::Ui, stats: &FullStats) {
                 &fmt_opt_pair(stats.rmssd_min, stats.rmssd_max),
                 TEAL,
             );
-            metric(
-                &mut c[1],
-                "SDNN min/max",
-                &fmt_opt_pair(stats.sdnn_min, stats.sdnn_max),
-                TEAL,
-            );
+            metric(&mut c[1], "SDNN min/max", &fmt_opt_pair(stats.sdnn_min, stats.sdnn_max), TEAL);
             metric(
                 &mut c[2],
                 "pNN50 min/max",
@@ -1082,7 +1024,11 @@ fn render_session_bpm_plot(ui: &mut egui::Ui, log: &SessionLog) {
         .include_y(y_lo)
         .include_y(y_hi)
         .show(ui, |plot_ui| {
-            plot_ui.line(Line::new("BPM", egui_plot::PlotPoints::from(pts)).color(HEART).width(1.6));
+            plot_ui.line(
+                Line::new("BPM", egui_plot::PlotPoints::from(pts))
+                    .color(HEART)
+                    .width(1.6),
+            );
         });
 }
 
@@ -1106,7 +1052,11 @@ fn render_session_rmssd_plot(ui: &mut egui::Ui, log: &SessionLog) {
         .include_y(0.0)
         .include_y(120.0)
         .show(ui, |plot_ui| {
-            plot_ui.line(Line::new("RMSSD", egui_plot::PlotPoints::from(pts)).color(TEAL).width(1.6));
+            plot_ui.line(
+                Line::new("RMSSD", egui_plot::PlotPoints::from(pts))
+                    .color(TEAL)
+                    .width(1.6),
+            );
         });
 }
 
@@ -1214,58 +1164,25 @@ fn icon_btn(ui: &mut egui::Ui, kind: IconKind, tooltip: &str) -> egui::Response 
         IconKind::Logs => {
             for i in [-1.0_f32, 0.0, 1.0] {
                 let y = c.y + i * 4.0;
-                painter.line_segment(
-                    [egui::pos2(c.x - 6.0, y), egui::pos2(c.x + 6.0, y)],
-                    stroke,
-                );
+                painter.line_segment([egui::pos2(c.x - 6.0, y), egui::pos2(c.x + 6.0, y)], stroke);
             }
         }
         IconKind::Save => {
-            painter.line_segment(
-                [egui::pos2(c.x, c.y - 6.0), egui::pos2(c.x, c.y + 3.0)],
-                stroke,
-            );
-            painter.line_segment(
-                [egui::pos2(c.x - 4.0, c.y - 1.0), egui::pos2(c.x, c.y + 3.0)],
-                stroke,
-            );
-            painter.line_segment(
-                [egui::pos2(c.x + 4.0, c.y - 1.0), egui::pos2(c.x, c.y + 3.0)],
-                stroke,
-            );
-            painter.line_segment(
-                [egui::pos2(c.x - 6.0, c.y + 6.5), egui::pos2(c.x + 6.0, c.y + 6.5)],
-                stroke,
-            );
+            painter.line_segment([egui::pos2(c.x, c.y - 6.0), egui::pos2(c.x, c.y + 3.0)], stroke);
+            painter.line_segment([egui::pos2(c.x - 4.0, c.y - 1.0), egui::pos2(c.x, c.y + 3.0)], stroke);
+            painter.line_segment([egui::pos2(c.x + 4.0, c.y - 1.0), egui::pos2(c.x, c.y + 3.0)], stroke);
+            painter.line_segment([egui::pos2(c.x - 6.0, c.y + 6.5), egui::pos2(c.x + 6.0, c.y + 6.5)], stroke);
         }
         IconKind::Close => {
-            painter.line_segment(
-                [egui::pos2(c.x - 5.0, c.y - 5.0), egui::pos2(c.x + 5.0, c.y + 5.0)],
-                stroke,
-            );
-            painter.line_segment(
-                [egui::pos2(c.x + 5.0, c.y - 5.0), egui::pos2(c.x - 5.0, c.y + 5.0)],
-                stroke,
-            );
+            painter.line_segment([egui::pos2(c.x - 5.0, c.y - 5.0), egui::pos2(c.x + 5.0, c.y + 5.0)], stroke);
+            painter.line_segment([egui::pos2(c.x + 5.0, c.y - 5.0), egui::pos2(c.x - 5.0, c.y + 5.0)], stroke);
         }
         IconKind::Refresh => {
-            painter.text(
-                c,
-                egui::Align2::CENTER_CENTER,
-                "↻",
-                FontId::proportional(14.0),
-                TEXT_HI,
-            );
+            painter.text(c, egui::Align2::CENTER_CENTER, "↻", FontId::proportional(14.0), TEXT_HI);
         }
         IconKind::Folder => {
-            let body = egui::Rect::from_min_size(
-                egui::pos2(c.x - 6.5, c.y - 3.0),
-                Vec2::new(13.0, 8.5),
-            );
-            let tab = egui::Rect::from_min_size(
-                egui::pos2(c.x - 6.5, c.y - 5.5),
-                Vec2::new(5.5, 3.0),
-            );
+            let body = egui::Rect::from_min_size(egui::pos2(c.x - 6.5, c.y - 3.0), Vec2::new(13.0, 8.5));
+            let tab = egui::Rect::from_min_size(egui::pos2(c.x - 6.5, c.y - 5.5), Vec2::new(5.5, 3.0));
             painter.rect_stroke(tab, CornerRadius::same(1), stroke, egui::StrokeKind::Inside);
             painter.rect_stroke(body, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
         }
@@ -1284,13 +1201,7 @@ enum ButtonStyle {
     Danger,
 }
 
-fn pill_btn(
-    ui: &mut egui::Ui,
-    label: &str,
-    text_color: Color32,
-    style: ButtonStyle,
-    enabled: bool,
-) -> egui::Response {
+fn pill_btn(ui: &mut egui::Ui, label: &str, text_color: Color32, style: ButtonStyle, enabled: bool) -> egui::Response {
     let font_id = FontId::proportional(11.5);
     let text_color = if enabled {
         text_color
@@ -1308,10 +1219,7 @@ fn pill_btn(
     let painter = ui.painter();
     let hovered = enabled && response.hovered();
     let (bg, stroke_color) = match style {
-        ButtonStyle::Neutral => (
-            if hovered { ICON_BG_HOVER } else { ICON_BG },
-            CARD_STROKE,
-        ),
+        ButtonStyle::Neutral => (if hovered { ICON_BG_HOVER } else { ICON_BG }, CARD_STROKE),
         ButtonStyle::Primary => (
             if hovered {
                 Color32::from_rgb(48, 38, 80)
@@ -1332,13 +1240,7 @@ fn pill_btn(
     let radius = CornerRadius::same(6);
     painter.rect_filled(rect, radius, bg);
     painter.rect_stroke(rect, radius, Stroke::new(1.0, stroke_color), egui::StrokeKind::Outside);
-    painter.text(
-        rect.center(),
-        egui::Align2::CENTER_CENTER,
-        label,
-        font_id,
-        text_color,
-    );
+    painter.text(rect.center(), egui::Align2::CENTER_CENTER, label, font_id, text_color);
     if hovered {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
@@ -1406,10 +1308,7 @@ fn session_row(
 }
 
 fn format_file_title_subtitle(path: &std::path::Path) -> (String, String) {
-    let stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("session");
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("session");
     let inner = stem.trim_start_matches("session_");
     if let Some((date, time)) = inner.split_once('_') {
         let time = time.replace('-', ":");

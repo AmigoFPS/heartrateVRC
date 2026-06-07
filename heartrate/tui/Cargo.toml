@@ -15,9 +15,3 @@ futures = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 color-eyre = { workspace = true }
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true

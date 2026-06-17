@@ -64,6 +64,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
     };
 
     let log_dir = logger::default_log_dir();
+    let sender = OscSender::new().await;
 
     loop {
         let mut host = match HeartrateDevice::new().await {
@@ -74,8 +75,6 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                 continue;
             }
         };
-
-        let sender = OscSender::new([127, 0, 0, 1], settings.send_port());
         let mut hrv_analyzer = HrvAnalyzer::new();
         let mut hrv_reset_until: Option<Instant> = None;
         let mut scanning = true;
@@ -98,7 +97,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                         scanning = false;
                     }
                     Err(err) => {
-                        let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+                        sender.send_bpm(0, settings.float_addresses(), settings.int_addresses()).await;
                         match err {
                             Error::DeviceNotFound
                             | Error::NotConnected
@@ -146,10 +145,10 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                         }
                         let hrv = if suppress_hrv { None } else { hrv_analyzer.compute() };
 
-                        let _ = sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses());
+                        sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses()).await;
 
                         if let Some(ref m) = hrv {
-                            let _ = sender.send_hrv(m, settings.hrv_addresses());
+                            sender.send_hrv(m, settings.hrv_addresses()).await;
                         }
 
                         if let Some(ref mut logger) = session_logger {
@@ -161,7 +160,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                     Err(err) => {
                         eprintln!("Get BPM error: {:?}", err);
 
-                        let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+                        sender.send_bpm(0, settings.float_addresses(), settings.int_addresses()).await;
 
                         match err {
                             Error::DeviceNotFound | Error::NotConnected | Error::TimedOut(_) => {
@@ -191,7 +190,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
     }
 }
 
-const AUTO_SAVE_MIN_SAMPLES: usize = 30;
+const AUTO_SAVE_MIN_SAMPLES: usize = 5000;
 
 fn auto_save(logger: &SessionLogger, log_dir: &std::path::Path, tx: &mpsc::Sender<BleEvent>) {
     if logger.sample_count() < AUTO_SAVE_MIN_SAMPLES {

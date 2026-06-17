@@ -8,7 +8,7 @@ use std::time::Duration;
 async fn main() {
     let settings = AppSettings::try_load_from_file("settings.json").expect("Unable to load settings");
     let mut host = HeartrateDevice::new().await.expect("Unable to create device");
-    let sender = OscSender::new([127, 0, 0, 1], settings.send_port());
+    let sender = OscSender::new().await;
     let mut hrv_analyzer = HrvAnalyzer::new();
     let mut state = AppState::Scanning;
 
@@ -25,7 +25,7 @@ async fn main() {
                     continue;
                 }
                 Err(err) => {
-                    let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+                    sender.send_bpm(0, settings.float_addresses(), settings.int_addresses()).await;
                     match err {
                         Error::DeviceNotFound | Error::NotConnected => {
                             eprintln!("Device not found, continuing search...");
@@ -49,13 +49,9 @@ async fn main() {
             AppState::Sending => match host.get_bpm().await {
                 Ok(data) => {
                     hrv_analyzer.add_rr_intervals(&data.intervals);
-                    if let Err(err) = sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses()) {
-                        panic!("Osc sending error: {}", err);
-                    }
+                    sender.send_bpm(data.bpm, settings.float_addresses(), settings.int_addresses()).await;
                     if let Some(metrics) = hrv_analyzer.compute() {
-                        if let Err(err) = sender.send_hrv(&metrics, settings.hrv_addresses()) {
-                            panic!("Osc HRV sending error: {}", err);
-                        }
+                        sender.send_hrv(&metrics, settings.hrv_addresses()).await;
                         println!(
                             "Sending {} BPM | HRV RMSSD:{:.1} SDNN:{:.1} pNN50:{:.1}",
                             data.bpm, metrics.rmssd, metrics.sdnn, metrics.pnn50
@@ -66,7 +62,7 @@ async fn main() {
                 }
                 Err(err) => {
                     eprintln!("Error: {}, searching for device...", err);
-                    let _ = sender.send_bpm(0, settings.float_addresses(), settings.int_addresses());
+                    sender.send_bpm(0, settings.float_addresses(), settings.int_addresses()).await;
                     let _ = host.disconnect().await;
                     state = AppState::Scanning;
                     tokio::time::sleep(Duration::from_millis(500)).await;

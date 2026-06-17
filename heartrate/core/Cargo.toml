@@ -11,3 +11,5 @@ futures = { workspace = true }
 rosc = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+vrchat_osc = { workspace = true }
+log = { workspace = true }

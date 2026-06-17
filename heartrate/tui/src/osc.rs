@@ -45,7 +45,7 @@ pub async fn run_osc_loop(mut osc_rx: tokio::sync::mpsc::Receiver<HeartRateData>
                 .send(
                     OscPacket::Message(OscMessage {
                         addr: addr.into(),
-                        args: vec![OscType::Float((data.bpm as f32) / 255.0)],
+                        args: vec![OscType::Float((data.bpm as f32) / 200.0)],
                     }),
                     "VRChat-Client-*",
                 )

@@ -58,7 +58,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     while !app.should_quit {
         let current_data = *tui_rx.borrow();
-        app.current_bpm = current_data.bpm;
+        // TODO: Implement 3 metrics
+        app.update_metrics(current_data.bpm, 0.0, 0.0, 0.0);
         tui.draw(&mut app)?;
 
         match tui.events.next()? {

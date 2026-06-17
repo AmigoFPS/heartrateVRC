@@ -9,15 +9,15 @@ pub async fn run_osc_loop(mut osc_rx: tokio::sync::mpsc::Receiver<HeartRateData>
     let vrchat_osc = match VRChatOSC::new(None).await {
         Ok(v) => v,
         Err(e) => {
-            log::warn!("Failed to initialize OSC Manager: {}", e);
+            log::warn!("[OSC] Failed to initialize Manager: {}", e);
             return;
         }
     };
 
     let root_node = OscRootNode::new().with_avatar();
     match vrchat_osc.register("HeartRate-Service", root_node, on_osc_packet).await {
-        Ok(_) => log::info!("OSC service registered"),
-        Err(e) => log::warn!("Failed to register OSC client: {}", e),
+        Ok(_) => log::info!("[OSC] service registered"),
+        Err(e) => log::warn!("[OSC] Failed to register client: {}", e),
     }
 
     // Wait for the service to be registered
@@ -35,8 +35,8 @@ pub async fn run_osc_loop(mut osc_rx: tokio::sync::mpsc::Receiver<HeartRateData>
                 )
                 .await
             {
-                Ok(_) => log::info!("Sending {} bpm via OSC.", data.bpm),
-                Err(e) => log::warn!("Failed to send OSC message: {}", e),
+                Ok(_) => {}
+                Err(e) => log::warn!("[OSC] Failed to send message: {}", e),
             };
         }
 
@@ -51,8 +51,8 @@ pub async fn run_osc_loop(mut osc_rx: tokio::sync::mpsc::Receiver<HeartRateData>
                 )
                 .await
             {
-                Ok(_) => log::info!("Sending {} bpm via OSC.", data.bpm),
-                Err(e) => log::warn!("Failed to send OSC message: {}", e),
+                Ok(_) => {}
+                Err(e) => log::warn!("[OSC] Failed to send message: {}", e),
             };
         }
     }

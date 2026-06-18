@@ -2,6 +2,7 @@ pub mod app;
 pub mod ble;
 pub mod data;
 pub mod event;
+pub mod hrv;
 pub mod logger;
 pub mod osc;
 pub mod page;

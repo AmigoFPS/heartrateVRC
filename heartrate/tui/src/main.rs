@@ -57,9 +57,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     while !app.should_quit {
-        let current_data = *tui_rx.borrow();
+        let current_data = tui_rx.borrow();
         // TODO: Implement 3 metrics
         app.update_metrics(current_data.bpm, 0.0, 0.0, 0.0);
+        drop(current_data);
         tui.draw(&mut app)?;
 
         match tui.events.next()? {
@@ -67,7 +68,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Event::Key(key_event) => update::update_key_event(&mut app, key_event),
             Event::Mouse(mouse_event) => update::update_mouse_event(&mut app, mouse_event),
             Event::Resize(_, _) => {}
-        };
+        }
     }
 
     tui.exit()?;

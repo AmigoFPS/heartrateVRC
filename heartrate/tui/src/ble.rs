@@ -138,7 +138,7 @@ async fn handle_device_stream(
                 if notification.uuid == HEART_RATE_MEASUREMENT_UUID {
                     if let Some(hr_data) = parse_heart_rate(&notification.value) {
                         // Forward safely to OSC and TUI
-                        let _ = osc_tx.send(hr_data).await;
+                        let _ = osc_tx.send(hr_data.clone()).await;
                         let _ = tui_tx.send(hr_data);
                     }
                 }
@@ -164,19 +164,42 @@ fn parse_heart_rate(bytes: &[u8]) -> Option<HeartRateData> {
 
     let flags = bytes[0];
     let is_u16 = (flags & 0x01) == 0x01;
+    let has_energy = (flags & 0x08) != 0;
+    let has_rr = (flags & 0x10) != 0;
 
-    let bpm = if is_u16 {
-        if bytes.len() < 3 {
-            return None;
-        }
+    let bpm = if is_u16 && bytes.len() >= 3 {
         u16::from_le_bytes([bytes[1], bytes[2]])
-    } else {
+    } else if bytes.len() >= 2 {
         bytes[1] as u16
+    } else {
+        0
     };
+
+    let mut rr_start = 1;
+    rr_start += match is_u16 {
+        true => 2,
+        false => 1,
+    };
+    rr_start += match has_energy {
+        true => 2,
+        false => 0,
+    };
+
+    let mut rr_intervals: Vec<u16> = vec![];
+    if has_rr && bytes.len() > rr_start {
+        rr_intervals = (rr_start..bytes.len().saturating_sub(1))
+            .step_by(2)
+            .filter_map(|i| match i + 1 < bytes.len() {
+                true => Some(u16::from_le_bytes([bytes[i], bytes[i + 1]])),
+                false => None,
+            })
+            .collect();
+    }
 
     // TODO: Retreive real data instead of mock data
     Some(HeartRateData {
-        bpm: bpm.checked_add(0).unwrap_or(bpm),
+        bpm,
+        intervals: rr_intervals,
         battery: 100,
     })
 }

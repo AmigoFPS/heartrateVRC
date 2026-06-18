@@ -7,6 +7,7 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::data::HeartRateData;
+use crate::hrv::{HrvMetrics, calculate_hrv};
 
 // UUID for the standard Bluetooth Heart Rate Service
 pub const HEART_RATE_SERVICE_UUID: Uuid = Uuid::from_u128(0x0000180d_0000_1000_8000_00805f9b34fb);
@@ -196,10 +197,8 @@ fn parse_heart_rate(bytes: &[u8]) -> Option<HeartRateData> {
             .collect();
     }
 
+    let hrv = calculate_hrv(&rr_intervals).unwrap_or(HrvMetrics::default());
+
     // TODO: Retreive real data instead of mock data
-    Some(HeartRateData {
-        bpm,
-        intervals: rr_intervals,
-        battery: 100,
-    })
+    Some(HeartRateData { bpm, hrv, battery: 100 })
 }

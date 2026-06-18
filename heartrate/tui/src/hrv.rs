@@ -8,20 +8,18 @@ pub struct HrvMetrics {
     pub pnn50: f64,
 }
 
-impl HrvMetrics {
-    pub fn calculate(intervals: &[u16]) -> Option<Self> {
-        if intervals.len() < 2 {
-            return None;
-        }
-
-        let intervals_f64: Vec<f64> = intervals.iter().map(|&x| x as f64).collect();
-
-        let rmssd = calculate_rmssd(&intervals_f64);
-        let sdnn = calculate_sdnn(&intervals_f64);
-        let pnn50 = calculate_pnn50(intervals);
-
-        Some(HrvMetrics { rmssd, sdnn, pnn50 })
+pub fn calculate_hrv(intervals: &[u16]) -> Option<HrvMetrics> {
+    if intervals.len() < 2 {
+        return None;
     }
+
+    let intervals_f64: Vec<f64> = intervals.iter().map(|&x| x as f64).collect();
+
+    let rmssd = calculate_rmssd(&intervals_f64);
+    let sdnn = calculate_sdnn(&intervals_f64);
+    let pnn50 = calculate_pnn50(intervals);
+
+    Some(HrvMetrics { rmssd, sdnn, pnn50 })
 }
 
 fn calculate_rmssd(intervals: &[f64]) -> f64 {
@@ -87,7 +85,7 @@ mod tests {
     #[test]
     fn test_hrv_metrics_calculate() {
         let intervals = vec![800, 820, 810, 830, 850];
-        let metrics = HrvMetrics::calculate(&intervals).unwrap();
+        let metrics = calculate_hrv(&intervals).unwrap();
         assert!(metrics.rmssd > 0.0);
         assert!(metrics.sdnn > 0.0);
         assert!(metrics.pnn50 >= 0.0);
@@ -96,12 +94,12 @@ mod tests {
     #[test]
     fn test_insufficient_data() {
         let intervals = vec![800];
-        assert!(HrvMetrics::calculate(&intervals).is_none());
+        assert!(calculate_hrv(&intervals).is_none());
     }
 
     #[test]
     fn test_empty_data() {
         let intervals: Vec<u16> = vec![];
-        assert!(HrvMetrics::calculate(&intervals).is_none());
+        assert!(calculate_hrv(&intervals).is_none());
     }
 }

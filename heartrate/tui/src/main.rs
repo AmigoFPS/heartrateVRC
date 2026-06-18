@@ -21,6 +21,7 @@ use crate::{
     ble::run_ble_loop,
     data::HeartRateData,
     event::{Event, EventHandler},
+    hrv::HrvMetrics,
     logger::LocalLogger,
     osc::run_osc_loop,
     settings::Settings,
@@ -59,8 +60,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     while !app.should_quit {
         let current_data = tui_rx.borrow();
-        // TODO: Implement 3 metrics
-        app.update_metrics(current_data.bpm, 0.0, 0.0, 0.0);
+        let metrics = HrvMetrics::calculate(&current_data.intervals).unwrap_or(HrvMetrics::default());
+        app.update_metrics(current_data.bpm, metrics.rmssd, metrics.sdnn, metrics.pnn50);
         drop(current_data);
         tui.draw(&mut app)?;
 

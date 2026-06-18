@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let settings = Settings::default()
-        .load_or_create("settings_v1.json")
+        .load_or_create("settings_v2.json")
         .expect("Unable to load settings");
 
     let (osc_tx, osc_rx) = mpsc::channel::<HeartRateData>(32);

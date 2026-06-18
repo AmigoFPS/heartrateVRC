@@ -44,7 +44,7 @@ pub async fn run_ble_loop(
     let manager = match Manager::new().await {
         Ok(m) => m,
         Err(e) => {
-            log::error!("Failed to initialize BLE Manager: {}", e);
+            log::error!("[BLE] Failed to initialize Manager: {}", e);
             return;
         }
     };

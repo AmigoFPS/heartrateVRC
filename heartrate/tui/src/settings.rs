@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 pub struct Settings {
     pub float_addresses: Vec<String>,
     pub int_addresses: Vec<String>,
-    pub hrv_addresses: Vec<String>,
+    pub rmssd_addresses: Vec<String>,
+    pub sdnn_addresses: Vec<String>,
+    pub pnn50_addresses: Vec<String>,
 }
 
 impl Default for Settings {
@@ -21,11 +23,9 @@ impl Default for Settings {
                 "/avatar/parameters/HeartrateInt".to_owned(),
                 "/avatar/parameters/HR".to_owned(),
             ],
-            hrv_addresses: vec![
-                "/avatar/parameters/HRV_RMSSD".to_owned(),
-                "/avatar/parameters/HRV_SDNN".to_owned(),
-                "/avatar/parameters/HRV_pNN50".to_owned(),
-            ],
+            rmssd_addresses: vec!["/avatar/parameters/HRV_RMSSD".to_owned()],
+            sdnn_addresses: vec!["/avatar/parameters/HRV_SDNN".to_owned()],
+            pnn50_addresses: vec!["/avatar/parameters/HRV_pNN50".to_owned()],
         }
     }
 }

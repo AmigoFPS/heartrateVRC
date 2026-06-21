@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 const RR_UNIT_MS: f64 = 1000.0 / 1024.0;
-const MIN_INTERVALS: usize = 10;
+const MIN_INTERVALS: usize = 20;
 const WINDOW_SIZE: usize = 256;
 
 #[derive(Debug, Clone)]

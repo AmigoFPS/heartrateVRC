@@ -30,6 +30,8 @@ crossterm = "0.29.0"
 color-eyre = "0.6.5"
 log = { version = "0.4.32", features = ["serde"] }
 vrchat_osc = "2.2.0"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+mdns-sd = "0.20"
 env_logger = "0.11.10"
 
 [profile.distribution]

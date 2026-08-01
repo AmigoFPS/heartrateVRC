@@ -8,6 +8,7 @@ use egui_plot::{Line, Plot};
 
 use crate::{BleEvent, GuiCommand};
 use heartrate_core::hrv::HrvMetrics;
+use heartrate_core::log_buffer;
 use heartrate_core::logger::{self, FullStats, SessionLog, SessionLogger};
 
 const BG: Color32 = Color32::from_rgb(13, 13, 23);
@@ -53,7 +54,6 @@ impl LayoutMode {
     }
 }
 
-#[derive(Default)]
 struct LogsView {
     files: Vec<PathBuf>,
     selected: SelectedLog,
@@ -61,6 +61,23 @@ struct LogsView {
     load_error: Option<String>,
     scanned: bool,
     export_status: Option<(Instant, String, bool)>,
+    show_debug: bool,
+    debug_follow: bool,
+}
+
+impl Default for LogsView {
+    fn default() -> Self {
+        Self {
+            files: Vec::new(),
+            selected: SelectedLog::default(),
+            loaded: None,
+            load_error: None,
+            scanned: false,
+            export_status: None,
+            show_debug: false,
+            debug_follow: true,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Default)]
@@ -266,9 +283,9 @@ impl HeartRateApp {
 }
 
 impl eframe::App for HeartRateApp {
-    fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {}
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll();
         let t = self.now();
         let plot_t = if self.last_data_t > 0.0 { self.last_data_t } else { t };
@@ -282,10 +299,9 @@ impl eframe::App for HeartRateApp {
 
         let mode = self.mode;
 
-        #[allow(deprecated)]
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(BG).inner_margin(8.0))
-            .show(ctx, |ui| {
+            .show(ui, |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
 
                 let next_mode = match mode {
@@ -609,18 +625,28 @@ impl HeartRateApp {
         let mut want_delete = false;
         let mut want_export = false;
         let mut want_save_live = false;
+        let mut want_toggle_debug = false;
+
+        let debug = self.logs.show_debug;
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Session Logs").color(TEXT_HI).size(14.0).strong());
+            let title = if debug { "Debug Log" } else { "Session Logs" };
+            ui.label(RichText::new(title).color(TEXT_HI).size(14.0).strong());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if icon_btn(ui, IconKind::Close, "Close").clicked() {
                     want_close = true;
                 }
-                if icon_btn(ui, IconKind::Refresh, "Refresh list").clicked() {
-                    want_rescan = true;
+                let debug_tooltip = if debug { "Back to session logs" } else { "Show debug log" };
+                if icon_btn_toggled(ui, IconKind::Debug, debug_tooltip, debug).clicked() {
+                    want_toggle_debug = true;
                 }
-                if icon_btn(ui, IconKind::Folder, "Open log folder").clicked() {
-                    want_open_dir = true;
+                if !debug {
+                    if icon_btn(ui, IconKind::Refresh, "Refresh list").clicked() {
+                        want_rescan = true;
+                    }
+                    if icon_btn(ui, IconKind::Folder, "Open log folder").clicked() {
+                        want_open_dir = true;
+                    }
                 }
             });
         });
@@ -632,6 +658,9 @@ impl HeartRateApp {
                 self.previous_mode
             });
         }
+        if want_toggle_debug {
+            self.logs.show_debug = !debug;
+        }
         if want_rescan {
             self.rescan_logs();
         }
@@ -642,6 +671,11 @@ impl HeartRateApp {
         }
 
         ui.separator();
+
+        if self.logs.show_debug {
+            self.render_debug_log(ui);
+            return next;
+        }
 
         ui.horizontal_top(|ui| {
             let list_w = (ui.available_width() * 0.32).clamp(180.0, 260.0);
@@ -678,6 +712,97 @@ impl HeartRateApp {
         }
 
         next
+    }
+
+    fn render_debug_log(&mut self, ui: &mut egui::Ui) {
+        let verbose = log_buffer::is_verbose();
+        let total = log_buffer::len();
+
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(format!("{} line(s)", total)).color(TEXT_LO).size(10.0));
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if pill_btn(ui, "Clear", TEXT_HI, ButtonStyle::Neutral, true).clicked() {
+                    log_buffer::clear();
+                }
+                let copy_enabled = total > 0;
+                if pill_btn(ui, "Copy", TEXT_HI, ButtonStyle::Neutral, copy_enabled).clicked() && copy_enabled {
+                    ui.ctx().copy_text(log_buffer::as_text());
+                    self.show_toast("Log copied to clipboard".to_owned(), false);
+                }
+
+                let follow_style = if self.logs.debug_follow {
+                    ButtonStyle::Primary
+                } else {
+                    ButtonStyle::Neutral
+                };
+                if pill_btn(ui, "Follow", TEXT_HI, follow_style, true).clicked() {
+                    self.logs.debug_follow = !self.logs.debug_follow;
+                }
+
+                let verbose_style = if verbose { ButtonStyle::Primary } else { ButtonStyle::Neutral };
+                let resp = pill_btn(ui, "Verbose", TEXT_HI, verbose_style, true);
+                if resp.clicked() {
+                    log_buffer::set_verbose(!verbose);
+                }
+                resp.on_hover_text("Include debug-level messages (device scans, OSC discovery)");
+            });
+        });
+
+        ui.add_space(4.0);
+
+        if total == 0 {
+            ui.label(
+                RichText::new("Nothing logged yet. Connection, disconnection and OSC discovery events appear here.")
+                    .color(TEXT_LO)
+                    .size(10.0),
+            );
+            return;
+        }
+
+        let font = FontId::monospace(10.5);
+        let row_h = ui
+            .painter()
+            .layout_no_wrap("X".to_owned(), font.clone(), TEXT_HI)
+            .size()
+            .y;
+
+        egui::Frame::new()
+            .fill(CARD)
+            .stroke(Stroke::new(1.0, CARD_STROKE))
+            .corner_radius(CornerRadius::same(6))
+            .inner_margin(6.0)
+            .show(ui, |ui| {
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+                ui.spacing_mut().item_spacing.y = 0.0;
+
+                egui::ScrollArea::both()
+                    .auto_shrink([false, false])
+                    .id_salt("debug_log_scroll")
+                    .stick_to_bottom(self.logs.debug_follow)
+                    .show_rows(ui, row_h, total, |ui, range| {
+                        for line in log_buffer::range(range.start, range.end) {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                ui.label(
+                                    RichText::new(line.timestamp())
+                                        .font(font.clone())
+                                        .color(TEXT_LO),
+                                );
+                                ui.label(
+                                    RichText::new(level_tag(line.level))
+                                        .font(font.clone())
+                                        .color(level_color(line.level)),
+                                );
+                                ui.label(
+                                    RichText::new(&line.message)
+                                        .font(font.clone())
+                                        .color(TEXT_HI),
+                                );
+                            });
+                        }
+                    });
+            });
     }
 
     fn render_logs_list(&mut self, ui: &mut egui::Ui) {
@@ -1146,16 +1271,27 @@ enum IconKind {
     Close,
     Refresh,
     Folder,
+    Debug,
 }
 
 fn icon_btn(ui: &mut egui::Ui, kind: IconKind, tooltip: &str) -> egui::Response {
+    icon_btn_toggled(ui, kind, tooltip, false)
+}
+
+fn icon_btn_toggled(ui: &mut egui::Ui, kind: IconKind, tooltip: &str, active: bool) -> egui::Response {
     let size = Vec2::new(ICON_SIZE, ICON_SIZE);
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     let painter = ui.painter();
-    let bg = if response.hovered() { ICON_BG_HOVER } else { ICON_BG };
+    let bg = match (active, response.hovered()) {
+        (true, true) => Color32::from_rgb(48, 38, 80),
+        (true, false) => Color32::from_rgb(38, 30, 65),
+        (false, true) => ICON_BG_HOVER,
+        (false, false) => ICON_BG,
+    };
     let radius = CornerRadius::same(6);
     painter.rect_filled(rect, radius, bg);
-    painter.rect_stroke(rect, radius, Stroke::new(1.0, CARD_STROKE), egui::StrokeKind::Outside);
+    let border = if active { PURPLE } else { CARD_STROKE };
+    painter.rect_stroke(rect, radius, Stroke::new(1.0, border), egui::StrokeKind::Outside);
 
     let c = rect.center();
     let stroke = Stroke::new(1.5, TEXT_HI);
@@ -1186,12 +1322,38 @@ fn icon_btn(ui: &mut egui::Ui, kind: IconKind, tooltip: &str) -> egui::Response 
             painter.rect_stroke(tab, CornerRadius::same(1), stroke, egui::StrokeKind::Inside);
             painter.rect_stroke(body, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
         }
+        IconKind::Debug => {
+            let body = egui::Rect::from_min_size(egui::pos2(c.x - 7.0, c.y - 5.5), Vec2::new(14.0, 11.0));
+            painter.rect_stroke(body, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
+            painter.line_segment([egui::pos2(c.x - 4.0, c.y - 2.5), egui::pos2(c.x - 1.5, c.y)], stroke);
+            painter.line_segment([egui::pos2(c.x - 4.0, c.y + 2.5), egui::pos2(c.x - 1.5, c.y)], stroke);
+            painter.line_segment([egui::pos2(c.x + 0.5, c.y + 3.0), egui::pos2(c.x + 4.5, c.y + 3.0)], stroke);
+        }
     }
 
     if response.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     response.on_hover_text(tooltip)
+}
+
+fn level_tag(level: log::Level) -> &'static str {
+    match level {
+        log::Level::Error => "ERR ",
+        log::Level::Warn => "WARN",
+        log::Level::Info => "INFO",
+        log::Level::Debug => "DBG ",
+        log::Level::Trace => "TRC ",
+    }
+}
+
+fn level_color(level: log::Level) -> Color32 {
+    match level {
+        log::Level::Error => RED,
+        log::Level::Warn => AMBER,
+        log::Level::Info => TEAL,
+        log::Level::Debug | log::Level::Trace => TEXT_LO,
+    }
 }
 
 #[derive(Clone, Copy)]

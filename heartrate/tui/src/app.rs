@@ -1,4 +1,8 @@
+use heartrate_core::hrv::HrvMetrics;
+
 use crate::page::Page;
+
+const MAX_POINTS: usize = 100;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct App {
@@ -37,27 +41,23 @@ impl App {
         self.should_quit = true
     }
 
-    pub fn update_metrics(&mut self, bpm: u16, rmssd: f64, sdnn: f64, pnn50: f64) {
+    pub fn update_metrics(&mut self, bpm: u16, hrv: Option<&HrvMetrics>) {
         self.current_bpm = bpm;
         let elapsed = self.start_time.elapsed().as_secs_f64();
 
-        self.heartrate_data.push((elapsed, bpm as f64));
-        self.rmssd_data.push((elapsed, rmssd));
-        self.sdnn_data.push((elapsed, sdnn));
-        self.pnn50_data.push((elapsed, pnn50));
+        push_point(&mut self.heartrate_data, (elapsed, bpm as f64));
 
-        let max_points = 100;
-        if self.heartrate_data.len() > max_points {
-            self.heartrate_data.remove(0);
+        if let Some(hrv) = hrv {
+            push_point(&mut self.rmssd_data, (elapsed, hrv.rmssd as f64));
+            push_point(&mut self.sdnn_data, (elapsed, hrv.sdnn as f64));
+            push_point(&mut self.pnn50_data, (elapsed, hrv.pnn50 as f64));
         }
-        if self.rmssd_data.len() > max_points {
-            self.rmssd_data.remove(0);
-        }
-        if self.sdnn_data.len() > max_points {
-            self.sdnn_data.remove(0);
-        }
-        if self.pnn50_data.len() > max_points {
-            self.pnn50_data.remove(0);
-        }
+    }
+}
+
+fn push_point(series: &mut Vec<(f64, f64)>, point: (f64, f64)) {
+    series.push(point);
+    if series.len() > MAX_POINTS {
+        series.remove(0);
     }
 }

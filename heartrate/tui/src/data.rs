@@ -1,8 +1,7 @@
-use crate::hrv::HrvMetrics;
+use heartrate_core::hrv::HrvMetrics;
 
 #[derive(Debug, Clone, Default)]
 pub struct HeartRateData {
     pub bpm: u16,
-    pub hrv: HrvMetrics,
-    pub battery: u8,
+    pub hrv: Option<HrvMetrics>,
 }

@@ -8,8 +8,7 @@ license.workspace = true
 
 [dependencies]
 heartrate_core.workspace = true
-btleplug = { workspace = true }
 tokio = { workspace = true }
-futures = { workspace = true }
+log = { workspace = true }
 eframe = { workspace = true }
 egui_plot = { workspace = true }

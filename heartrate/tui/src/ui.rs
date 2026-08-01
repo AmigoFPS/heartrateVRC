@@ -5,9 +5,10 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Padding, Paragraph, Tabs},
 };
 
+use heartrate_core::log_buffer;
+
 use crate::{
     app::App,
-    logger::LocalLogger,
     page::{Page, draw_metric_chart},
 };
 
@@ -72,12 +73,16 @@ pub fn render_pnn50_page(app: &mut App, frame: &mut ratatui::Frame, area: Rect) 
 }
 
 fn render_logs_page(_app: &mut App, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-    let recent_logs = LocalLogger::get_last_lines(20);
+    let recent_logs = log_buffer::last(20);
 
     let log_text = if recent_logs.is_empty() {
         "No log entries recorded yet.".to_string()
     } else {
-        recent_logs.join("\n")
+        recent_logs
+            .iter()
+            .map(|line| line.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
     };
 
     let logs_paragraph = Paragraph::new(log_text)

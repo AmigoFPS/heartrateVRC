@@ -6,11 +6,11 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use btleplug::{Error, api::Peripheral};
 use eframe::egui;
 use heartrate_core::{
     heartrate_device::HeartrateDevice,
     hrv::{HrvAnalyzer, HrvMetrics},
+    log_buffer,
     logger::{self, SessionLogger},
     osc::OscSender,
     settings_manager::AppSettings,
@@ -32,6 +32,8 @@ pub enum BleEvent {
 }
 
 fn main() -> eframe::Result {
+    let _ = log_buffer::init();
+
     let (tx, rx) = mpsc::channel();
     let (tx_cmd, rx_cmd) = mpsc::channel();
 
@@ -58,18 +60,20 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
     let settings = match AppSettings::try_load_from_file("settings.json") {
         Ok(s) => s,
         Err(e) => {
+            log::error!("[APP] Failed to load settings.json: {e}");
             let _ = tx.send(BleEvent::FatalError(format!("Settings: {e}")));
             return;
         }
     };
 
     let log_dir = logger::default_log_dir();
-    let sender = OscSender::new().await;
+    let sender = OscSender::new(settings.send_port()).await;
 
     loop {
         let mut host = match HeartrateDevice::new().await {
             Ok(h) => h,
             Err(e) => {
+                log::error!("[BLE] Bluetooth unavailable: {e}; retrying in 2s...");
                 let _ = tx.send(BleEvent::FatalError(format!("Bluetooth: {e}")));
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;
@@ -79,18 +83,14 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
         let mut hrv_reset_until: Option<Instant> = None;
         let mut scanning = true;
         let mut session_logger: Option<SessionLogger> = None;
+        log::info!("[BLE] Scanning for a heart rate device...");
         let _ = tx.send(BleEvent::Scanning);
 
         loop {
             if scanning {
                 match host.auto_connect().await {
-                    Ok(device) => {
-                        let name = device
-                            .properties()
-                            .await
-                            .unwrap_or_default()
-                            .and_then(|p| p.local_name)
-                            .unwrap_or_default();
+                    Ok(name) => {
+                        log::info!("[BLE] Connected to {name}");
                         hrv_analyzer = HrvAnalyzer::new();
                         session_logger = Some(SessionLogger::new(name.clone()));
                         let _ = tx.send(BleEvent::Connected(name));
@@ -98,17 +98,13 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                     }
                     Err(err) => {
                         sender.send_bpm(0, settings.float_addresses(), settings.int_addresses()).await;
-                        match err {
-                            Error::DeviceNotFound
-                            | Error::NotConnected
-                            | Error::NoSuchCharacteristic
-                            | Error::TimedOut(_) => continue,
-                            other => {
-                                eprintln!("Connection error: {:?}", other);
-                                let _ = tx.send(BleEvent::FatalError(format!("{other}")));
-                                break;
-                            }
+                        if err.is_recoverable() {
+                            log::debug!("[BLE] {err}; continuing search...");
+                            continue;
                         }
+                        log::error!("[BLE] {err}; re-initializing...");
+                        let _ = tx.send(BleEvent::FatalError(format!("{err}")));
+                        break;
                     }
                 }
             } else {
@@ -123,9 +119,11 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                                 if !logger.is_empty() {
                                     match logger.save(&log_dir) {
                                         Ok(path) => {
+                                            log::info!("[LOG] Session saved to {}", path.display());
                                             let _ = tx.send(BleEvent::LogSaved(path));
                                         }
                                         Err(e) => {
+                                            log::warn!("[LOG] Failed to save session: {e}");
                                             let _ = tx.send(BleEvent::LogError(format!("{e}")));
                                         }
                                     }
@@ -158,28 +156,22 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                         let _ = tx.send(BleEvent::Data { bpm: data.bpm, hrv });
                     }
                     Err(err) => {
-                        eprintln!("Get BPM error: {:?}", err);
-
                         sender.send_bpm(0, settings.float_addresses(), settings.int_addresses()).await;
 
-                        match err {
-                            Error::DeviceNotFound | Error::NotConnected | Error::TimedOut(_) => {
-                                if let Some(logger) = session_logger.take() {
-                                    auto_save(&logger, &log_dir, &tx);
-                                }
-                                let _ = tx.send(BleEvent::Disconnected);
-                                scanning = true;
-                                continue;
-                            }
-                            other => {
-                                eprintln!("Unrecoverable error: {:?}", other);
-                                if let Some(logger) = session_logger.take() {
-                                    auto_save(&logger, &log_dir, &tx);
-                                }
-                                let _ = tx.send(BleEvent::FatalError(format!("{other}")));
-                                break;
-                            }
+                        if let Some(logger) = session_logger.take() {
+                            auto_save(&logger, &log_dir, &tx);
                         }
+
+                        if err.is_recoverable() {
+                            log::warn!("[BLE] {err}; returning to discovery...");
+                            let _ = tx.send(BleEvent::Disconnected);
+                            scanning = true;
+                            continue;
+                        }
+
+                        log::error!("[BLE] {err}; re-initializing...");
+                        let _ = tx.send(BleEvent::FatalError(format!("{err}")));
+                        break;
                     }
                 }
             }
@@ -198,9 +190,11 @@ fn auto_save(logger: &SessionLogger, log_dir: &std::path::Path, tx: &mpsc::Sende
     }
     match logger.save(log_dir) {
         Ok(path) => {
+            log::info!("[LOG] Session auto-saved to {}", path.display());
             let _ = tx.send(BleEvent::LogSaved(path));
         }
         Err(e) => {
+            log::warn!("[LOG] Failed to auto-save session: {e}");
             let _ = tx.send(BleEvent::LogError(format!("{e}")));
         }
     }

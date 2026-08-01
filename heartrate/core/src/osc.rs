@@ -1,49 +1,37 @@
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use rosc::{OscMessage, OscPacket, OscType};
 use serde::Deserialize;
 use tokio::net::UdpSocket;
+use tokio::task::JoinHandle;
 
 use crate::hrv::HrvMetrics;
 
-type OscResult<T> = std::result::Result<T, OscError>;
+const MDNS_SERVICE: &str = "_oscjson._tcp.local.";
+const VRCHAT_HOST_PREFIX: &str = "VRChat-Client-";
 
-#[derive(Debug)]
-pub struct OscError(pub String);
+const RESCAN_INTERVAL: Duration = Duration::from_secs(5);
+const HTTP_TIMEOUT: Duration = Duration::from_secs(2);
+const BROWSE_POLL: Duration = Duration::from_secs(1);
 
-impl std::fmt::Display for OscError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for OscError {}
-
-impl From<std::io::Error> for OscError {
-    fn from(e: std::io::Error) -> Self {
-        Self(e.to_string())
-    }
-}
-
-impl From<rosc::OscError> for OscError {
-    fn from(e: rosc::OscError) -> Self {
-        Self(e.to_string())
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum OscValue {
-    Bool(bool),
-    Float(f32),
-}
-
+const BPM_FLOAT_SCALE: f32 = 200.0;
+const HRV_MS_FLOAT_SCALE: f32 = 200.0;
 #[derive(Debug, Clone)]
 pub struct VrchatAddress {
     pub osc_ip: String,
     pub osc_port: u16,
     pub http_addr: SocketAddr,
+}
+
+impl VrchatAddress {
+    pub fn osc_target(&self) -> String {
+        format!("{}:{}", self.osc_ip, self.osc_port)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,281 +44,330 @@ struct HostInfo {
     osc_port: u16,
 }
 
-#[derive(Debug, Deserialize)]
-struct OscQueryNode {
-    #[serde(rename = "FULL_PATH")]
-    full_path: Option<String>,
-    #[serde(rename = "VALUE")]
-    value: Option<Vec<serde_json::Value>>,
-    #[serde(rename = "CONTENTS")]
-    contents: Option<HashMap<String, OscQueryNode>>,
+struct ClientInner {
+    http: reqwest::Client,
+    address: RwLock<Option<VrchatAddress>>,
+    services: Mutex<HashMap<String, (Vec<IpAddr>, u16)>>,
+    stop: AtomicBool,
 }
 
-struct MdnsCandidate {
-    http_addr: SocketAddr,
+pub struct VrchatClient {
+    inner: Arc<ClientInner>,
+    rescan_task: JoinHandle<()>,
 }
 
-pub struct VrchatOscQuery {
-    client: reqwest::Client,
-    address: Option<VrchatAddress>,
-}
+impl VrchatClient {
+    pub fn start() -> Self {
+        let inner = Arc::new(ClientInner {
+            http: reqwest::Client::builder()
+                .timeout(HTTP_TIMEOUT)
+                .build()
+                .unwrap_or_default(),
+            address: RwLock::new(None),
+            services: Mutex::new(HashMap::new()),
+            stop: AtomicBool::new(false),
+        });
 
-impl VrchatOscQuery {
-    pub fn new() -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            address: None,
-        }
-    }
+        let browse_inner = Arc::clone(&inner);
+        std::thread::spawn(move || browse_worker(browse_inner));
 
-    pub fn get_address(&self) -> Option<&VrchatAddress> {
-        self.address.as_ref()
-    }
-
-    pub async fn discover(&mut self) -> OscResult<bool> {
-        let candidates = tokio::task::spawn_blocking(scan_mdns)
-            .await
-            .map_err(|e| OscError(format!("spawn_blocking failed: {e}")))?;
-
-        for candidate in candidates {
-            match self.check_candidate(&candidate).await {
-                Ok(Some(addr)) => {
-                    log::info!(
-                        "VRChat OSCQuery found at {} (OSC {}:{})",
-                        candidate.http_addr,
-                        addr.osc_ip,
-                        addr.osc_port
-                    );
-                    self.address = Some(addr);
-                    return Ok(true);
+        let rescan_inner = Arc::clone(&inner);
+        let rescan_task = tokio::spawn(async move {
+            loop {
+                if rescan_inner.stop.load(Ordering::Relaxed) {
+                    return;
                 }
-                Ok(None) => {}
-                Err(e) => {
-                    log::debug!("OSCQuery candidate {} rejected: {}", candidate.http_addr, e);
+                rescan(&rescan_inner).await;
+                tokio::time::sleep(RESCAN_INTERVAL).await;
+            }
+        });
+
+        Self { inner, rescan_task }
+    }
+
+    pub fn address(&self) -> Option<VrchatAddress> {
+        self.inner.address.read().ok().and_then(|a| a.clone())
+    }
+
+    pub fn shutdown(&self) {
+        self.inner.stop.store(true, Ordering::Relaxed);
+        self.rescan_task.abort();
+    }
+}
+
+impl Drop for VrchatClient {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+fn browse_worker(inner: Arc<ClientInner>) {
+    use mdns_sd::{ScopedIp, ServiceDaemon, ServiceEvent};
+
+    let daemon = match ServiceDaemon::new() {
+        Ok(d) => d,
+        Err(e) => {
+            log::warn!("[OSC] mDNS unavailable: {e}");
+            return;
+        }
+    };
+    let receiver = match daemon.browse(MDNS_SERVICE) {
+        Ok(r) => r,
+        Err(e) => {
+            log::warn!("[OSC] mDNS browse failed: {e}");
+            return;
+        }
+    };
+
+    while !inner.stop.load(Ordering::Relaxed) {
+        match receiver.recv_timeout(BROWSE_POLL) {
+            Ok(ServiceEvent::ServiceResolved(info)) => {
+                let addrs: Vec<IpAddr> = info
+                    .get_addresses()
+                    .iter()
+                    .filter_map(|a| match a {
+                        ScopedIp::V4(v4) => Some(IpAddr::V4(*v4.addr())),
+                        ScopedIp::V6(v6) => Some(IpAddr::V6(*v6.addr())),
+                        _ => None,
+                    })
+                    .filter(|ip| !ip.is_unspecified())
+                    .collect();
+
+                log::debug!("[OSC] mDNS resolved {} at {:?}", info.get_fullname(), addrs);
+                if let Ok(mut services) = inner.services.lock() {
+                    services.insert(info.get_fullname().to_string(), (addrs, info.get_port()));
                 }
             }
+            Ok(ServiceEvent::ServiceRemoved(_, fullname)) => {
+                if let Ok(mut services) = inner.services.lock() {
+                    services.remove(&fullname);
+                }
+            }
+            Ok(_) | Err(_) => {}
         }
-
-        Ok(false)
     }
 
-    async fn check_candidate(&self, candidate: &MdnsCandidate) -> OscResult<Option<VrchatAddress>> {
-        let url = format!("http://{}/?HOST_INFO", candidate.http_addr);
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| OscError(e.to_string()))?;
+    let _ = daemon.shutdown();
+}
 
-        let info: HostInfo = resp.json().await.map_err(|e| OscError(e.to_string()))?;
-
-        if !info.name.starts_with("VRChat-Client-") {
-            return Ok(None);
+async fn rescan(inner: &Arc<ClientInner>) {
+    if let Some(addr) = inner.address.read().ok().and_then(|a| a.clone()) {
+        if check_endpoint(inner, addr.http_addr).await {
+            return;
         }
+        log::info!("[OSC] Lost VRChat at {}; rediscovering...", addr.http_addr);
+        if let Ok(mut slot) = inner.address.write() {
+            *slot = None;
+        }
+    }
 
-        Ok(Some(VrchatAddress {
+    let candidates: Vec<(Vec<IpAddr>, u16)> = inner
+        .services
+        .lock()
+        .map(|s| s.values().cloned().collect())
+        .unwrap_or_default();
+    let local = local_addresses();
+
+    for (ips, port) in candidates {
+        for ip in ips {
+            if !local.contains(&ip) {
+                log::debug!("[OSC] Skipping mDNS candidate {ip}:{port} (not a local address)");
+                continue;
+            }
+            if !ip.is_loopback()
+                && check_endpoint(inner, SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)).await
+            {
+                return;
+            }
+            if check_endpoint(inner, SocketAddr::new(ip, port)).await {
+                return;
+            }
+        }
+    }
+
+    if let Some(port) = oscquery_port_from_logs().await {
+        log::debug!("[OSC] Found VRChat OSCQuery port {port} in log file");
+        check_endpoint(inner, SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)).await;
+    }
+}
+
+async fn check_endpoint(inner: &Arc<ClientInner>, http_addr: SocketAddr) -> bool {
+    let url = format!("http://{http_addr}/?HOST_INFO");
+    let info: HostInfo = match inner.http.get(&url).send().await {
+        Ok(resp) => match resp.json().await {
+            Ok(json) => json,
+            Err(_) => return false,
+        },
+        Err(_) => return false,
+    };
+
+    if !info.name.starts_with(VRCHAT_HOST_PREFIX) {
+        log::debug!("[OSC] Skipping {http_addr} ({} is not VRChat)", info.name);
+        return false;
+    }
+
+    let is_new = inner
+        .address
+        .read()
+        .ok()
+        .and_then(|a| a.clone())
+        .is_none_or(|a| a.http_addr != http_addr || a.osc_port != info.osc_port);
+
+    if is_new {
+        log::info!(
+            "[OSC] VRChat found at {http_addr} (OSC {}:{})",
+            info.osc_ip,
+            info.osc_port
+        );
+    }
+
+    if let Ok(mut slot) = inner.address.write() {
+        *slot = Some(VrchatAddress {
             osc_ip: info.osc_ip,
             osc_port: info.osc_port,
-            http_addr: candidate.http_addr,
-        }))
+            http_addr,
+        });
     }
-
-    pub async fn get_bulk(&self) -> OscResult<Vec<(String, OscValue)>> {
-        let addr = self
-            .address
-            .as_ref()
-            .ok_or_else(|| OscError("VRChat not yet discovered".to_string()))?;
-
-        let url = format!("http://{}/avatar/parameters", addr.http_addr);
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| OscError(e.to_string()))?;
-
-        let node: OscQueryNode = resp.json().await.map_err(|e| OscError(e.to_string()))?;
-
-        let mut params = Vec::new();
-        collect_params(&node, &mut params);
-        Ok(params)
-    }
+    true
 }
 
-impl Default for VrchatOscQuery {
-    fn default() -> Self {
-        Self::new()
+fn local_addresses() -> Vec<IpAddr> {
+    let mut out = vec![IpAddr::V4(Ipv4Addr::LOCALHOST), IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)];
+    if let Ok(ifaces) = if_addrs::get_if_addrs() {
+        out.extend(ifaces.into_iter().map(|i| i.ip()));
     }
+    out
 }
 
-fn scan_mdns() -> Vec<MdnsCandidate> {
-    let mut candidates = Vec::new();
-
-    match try_scan_mdns(&mut candidates) {
-        Ok(()) => {}
-        Err(e) => log::warn!("mDNS scan failed: {}", e),
-    }
-
-    if candidates.is_empty() {
-        log::debug!("mDNS found nothing; falling back to localhost:9001");
-        if let Ok(addr) = "127.0.0.1:9001".parse() {
-            candidates.push(MdnsCandidate { http_addr: addr });
-        }
-    }
-
-    candidates
+fn vrchat_log_dir() -> Option<PathBuf> {
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
+    Some(
+        PathBuf::from(home)
+            .join("AppData")
+            .join("LocalLow")
+            .join("VRChat")
+            .join("VRChat"),
+    )
 }
 
-fn try_scan_mdns(out: &mut Vec<MdnsCandidate>) -> std::result::Result<(), String> {
-    use mdns_sd::{ServiceDaemon, ServiceEvent};
+async fn oscquery_port_from_logs() -> Option<u16> {
+    tokio::task::spawn_blocking(|| {
+        let dir = vrchat_log_dir()?;
+        let newest = std::fs::read_dir(dir)
+            .ok()?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with("output_log_"))
+            .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())?;
 
-    let mdns = ServiceDaemon::new().map_err(|e| e.to_string())?;
-    let receiver = mdns.browse("_oscjson._tcp.local.").map_err(|e| e.to_string())?;
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-
-    loop {
-        let now = std::time::Instant::now();
-        if now >= deadline {
-            break;
-        }
-        let remaining = deadline - now;
-        let poll = remaining.min(Duration::from_millis(500));
-
-        match receiver.recv_timeout(poll) {
-            Ok(ServiceEvent::ServiceResolved(info)) => {
-                let port = info.get_port();
-                for addr in info.get_addresses() {
-                    use mdns_sd::ScopedIp;
-                    let ip: std::net::IpAddr = match addr {
-                        ScopedIp::V4(v4) => std::net::IpAddr::V4(*v4.addr()),
-                        ScopedIp::V6(v6) => std::net::IpAddr::V6(*v6.addr()),
-                        _ => continue,
-                    };
-                    let socket_addr = SocketAddr::new(ip, port);
-                    log::debug!("mDNS found oscjson service at {}", socket_addr);
-                    out.push(MdnsCandidate { http_addr: socket_addr });
-                }
-            }
-            Ok(_) => {}
-            Err(_) => break,
-        }
-    }
-
-    mdns.stop_browse("_oscjson._tcp.local.").ok();
-    Ok(())
+        let content = std::fs::read_to_string(newest.path()).ok()?;
+        parse_oscquery_port(&content)
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
-fn collect_params(node: &OscQueryNode, out: &mut Vec<(String, OscValue)>) {
-    if let Some(path) = &node.full_path {
-        if path.starts_with("/avatar/parameters/") {
-            if let Some(values) = &node.value {
-                if let Some(first) = values.first() {
-                    if let Some(v) = json_to_osc_value(first) {
-                        out.push((path.clone(), v));
-                    }
-                }
-            }
+fn parse_oscquery_port(content: &str) -> Option<u16> {
+    const MARKER: &str = "of type OSCQuery on ";
+    let mut result = None;
+    let mut rest = content;
+    while let Some(pos) = rest.find(MARKER) {
+        let after = &rest[pos + MARKER.len()..];
+        let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(port) = digits.parse::<u16>() {
+            result = Some(port);
         }
+        rest = &after[digits.len()..];
     }
-    if let Some(contents) = &node.contents {
-        for child in contents.values() {
-            collect_params(child, out);
-        }
-    }
-}
-
-pub fn json_to_osc_value(v: &serde_json::Value) -> Option<OscValue> {
-    match v {
-        serde_json::Value::Bool(b) => Some(OscValue::Bool(*b)),
-        serde_json::Value::Number(n) => n.as_f64().map(|f| OscValue::Float(f as f32)),
-        _ => None,
-    }
+    result
 }
 
 pub struct OscSender {
     socket: Option<UdpSocket>,
-    dest: Option<String>,
+    client: VrchatClient,
+    fallback: String,
+    on_fallback: AtomicBool,
 }
 
 impl OscSender {
-    pub async fn new() -> Self {
-        let mut query = VrchatOscQuery::new();
-        match query.discover().await {
-            Ok(true) => {}
-            Ok(false) => {
-                log::warn!("[OSC] VRChat not found via mDNS/OSCQuery");
-                return Self { socket: None, dest: None };
-            }
+    pub async fn new(fallback_port: u16) -> Self {
+        let socket = match UdpSocket::bind("0.0.0.0:0").await {
+            Ok(s) => Some(s),
             Err(e) => {
-                log::warn!("[OSC] Discovery failed: {}", e);
-                return Self { socket: None, dest: None };
+                log::error!("[OSC] Failed to bind UDP socket: {e}; OSC output disabled");
+                None
             }
-        }
-
-        let Some(addr) = query.get_address() else {
-            return Self { socket: None, dest: None };
         };
 
-        let dest = format!("{}:{}", addr.osc_ip, addr.osc_port);
-        match UdpSocket::bind("0.0.0.0:0").await {
-            Ok(socket) => {
-                log::info!("[OSC] Ready to send to {}", dest);
-                Self {
-                    socket: Some(socket),
-                    dest: Some(dest),
-                }
-            }
-            Err(e) => {
-                log::warn!("[OSC] Failed to bind UDP socket: {}", e);
-                Self { socket: None, dest: None }
-            }
+        Self {
+            socket,
+            client: VrchatClient::start(),
+            fallback: format!("127.0.0.1:{fallback_port}"),
+            on_fallback: AtomicBool::new(false),
         }
     }
 
+    pub fn is_connected(&self) -> bool {
+        self.client.address().is_some()
+    }
+
+    pub fn address(&self) -> Option<VrchatAddress> {
+        self.client.address()
+    }
+
     pub async fn send_bpm(&self, bpm: i32, float_addresses: &[String], int_addresses: &[String]) {
-        let Some(ref socket) = self.socket else { return };
-        let Some(ref dest) = self.dest else { return };
+        let Some(target) = self.target() else { return };
 
         for addr in float_addresses {
-            self.send_message(
-                socket,
-                dest,
-                addr,
-                OscType::Float(bpm as f32 / 200.0),
-            )
-            .await;
+            self.send_message(&target, addr, OscType::Float(bpm as f32 / BPM_FLOAT_SCALE))
+                .await;
         }
 
         for addr in int_addresses {
-            self.send_message(socket, dest, addr, OscType::Int(bpm)).await;
+            self.send_message(&target, addr, OscType::Int(bpm)).await;
         }
     }
 
     pub async fn send_hrv(&self, metrics: &HrvMetrics, addresses: &[String]) {
-        let Some(ref socket) = self.socket else { return };
-        let Some(ref dest) = self.dest else { return };
+        let Some(target) = self.target() else { return };
 
-        let values = [
-            (metrics.rmssd / 200.0).min(1.0),
-            (metrics.sdnn / 200.0).min(1.0),
-            (metrics.pnn50 / 100.0).min(1.0),
-        ];
-
-        for (i, addr) in addresses.iter().enumerate() {
-            if let Some(&v) = values.get(i) {
-                self.send_message(socket, dest, addr, OscType::Float(v)).await;
-            }
+        let values = normalize_hrv(metrics);
+        for (addr, value) in addresses.iter().zip(values) {
+            self.send_message(&target, addr, OscType::Float(value)).await;
         }
     }
 
-    pub async fn shutdown(self) {
+    pub fn shutdown(self) {
+        self.client.shutdown();
         drop(self.socket);
         log::info!("[OSC] Shutdown complete");
     }
 
-    async fn send_message(&self, socket: &UdpSocket, dest: &str, addr: &str, value: OscType) {
+    fn target(&self) -> Option<String> {
+        self.socket.as_ref()?;
+
+        match self.client.address() {
+            Some(addr) => {
+                if self.on_fallback.swap(false, Ordering::Relaxed) {
+                    log::info!("[OSC] Now sending to discovered VRChat at {}", addr.osc_target());
+                }
+                Some(addr.osc_target())
+            }
+            None => {
+                if !self.on_fallback.swap(true, Ordering::Relaxed) {
+                    log::warn!(
+                        "[OSC] VRChat not discovered yet; sending to default {}",
+                        self.fallback
+                    );
+                }
+                Some(self.fallback.clone())
+            }
+        }
+    }
+
+    async fn send_message(&self, target: &str, addr: &str, value: OscType) {
+        let Some(ref socket) = self.socket else { return };
+
         let packet = OscPacket::Message(OscMessage {
             addr: addr.to_string(),
             args: vec![value],
@@ -338,11 +375,64 @@ impl OscSender {
 
         match rosc::encoder::encode(&packet) {
             Ok(buf) => {
-                if let Err(e) = socket.send_to(&buf, dest).await {
-                    log::warn!("[OSC] Failed to send to {}: {}", addr, e);
+                if let Err(e) = socket.send_to(&buf, target).await {
+                    log::warn!("[OSC] Failed to send {addr} to {target}: {e}");
                 }
             }
-            Err(e) => log::warn!("[OSC] Failed to encode message for {}: {}", addr, e),
+            Err(e) => log::warn!("[OSC] Failed to encode message for {addr}: {e}"),
         }
+    }
+}
+
+fn normalize_hrv(metrics: &HrvMetrics) -> [f32; 3] {
+    [
+        (metrics.rmssd / HRV_MS_FLOAT_SCALE).clamp(0.0, 1.0),
+        (metrics.sdnn / HRV_MS_FLOAT_SCALE).clamp(0.0, 1.0),
+        (metrics.pnn50 / 100.0).clamp(0.0, 1.0),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn host_prefix_matches_vrchat_only() {
+        assert!("VRChat-Client-35464D".starts_with(VRCHAT_HOST_PREFIX));
+        assert!("VRChat-Client-".starts_with(VRCHAT_HOST_PREFIX));
+        assert!(!"OyasumiVR".starts_with(VRCHAT_HOST_PREFIX));
+        assert!(!"HeartRate-Service".starts_with(VRCHAT_HOST_PREFIX));
+    }
+
+    #[test]
+    fn log_port_parsing_takes_last_match() {
+        let log = "junk\nBlah of type OSCQuery on 9012 something\nof type OSCQuery on 34567\n";
+        assert_eq!(parse_oscquery_port(log), Some(34567));
+        assert_eq!(parse_oscquery_port("no match"), None);
+    }
+
+    #[test]
+    fn hrv_normalization_is_clamped() {
+        let metrics = HrvMetrics {
+            rmssd: 100.0,
+            sdnn: 400.0,
+            pnn50: 50.0,
+        };
+        assert_eq!(normalize_hrv(&metrics), [0.5, 1.0, 0.5]);
+    }
+
+    #[test]
+    fn hrv_normalization_handles_zero() {
+        let metrics = HrvMetrics {
+            rmssd: 0.0,
+            sdnn: 0.0,
+            pnn50: 0.0,
+        };
+        assert_eq!(normalize_hrv(&metrics), [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn local_addresses_include_loopback() {
+        assert!(local_addresses().contains(&IpAddr::V4(Ipv4Addr::LOCALHOST)));
     }
 }

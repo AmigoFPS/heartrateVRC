@@ -12,6 +12,7 @@ pub struct App {
     pub pnn50_data: Vec<(f64, f64)>,
 
     pub current_bpm: u16,
+    pub current_hrv: Option<HrvMetrics>,
     pub current_page: Page,
     pub should_quit: bool,
     pub start_time: std::time::Instant,
@@ -22,6 +23,7 @@ impl Default for App {
         Self {
             heartrate_data: Default::default(),
             current_bpm: Default::default(),
+            current_hrv: None,
             rmssd_data: Default::default(),
             sdnn_data: Default::default(),
             pnn50_data: Default::default(),
@@ -43,6 +45,7 @@ impl App {
 
     pub fn update_metrics(&mut self, bpm: u16, hrv: Option<&HrvMetrics>) {
         self.current_bpm = bpm;
+        self.current_hrv = hrv.copied();
         let elapsed = self.start_time.elapsed().as_secs_f64();
 
         push_point(&mut self.heartrate_data, (elapsed, bpm as f64));

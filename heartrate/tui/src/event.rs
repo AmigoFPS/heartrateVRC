@@ -39,7 +39,7 @@ impl EventHandler {
                                 if e.kind == event::KeyEventKind::Press {
                                     sender.send(Event::Key(e))
                                 } else {
-                                    Ok(()) // ignore KeyEventKind::Release on windows
+                                    Ok(())
                                 }
                             }
                             CrosstermEvent::Mouse(e) => sender.send(Event::Mouse(e)),

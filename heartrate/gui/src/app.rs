@@ -36,6 +36,10 @@ const RESET_BUTTON_COOLDOWN_SECS: f32 = 11.0;
 
 const ICON_SIZE: f32 = 26.0;
 
+const SIGNAL_ROW_H: f32 = 36.0;
+
+pub const DEFAULT_WINDOW_SIZE: [f32; 2] = [320.0, 560.0];
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum LayoutMode {
     Full,
@@ -47,8 +51,8 @@ enum LayoutMode {
 impl LayoutMode {
     fn size(self) -> Vec2 {
         match self {
-            LayoutMode::Full => Vec2::new(320.0, 520.0),
-            LayoutMode::Lite => Vec2::new(340.0, 210.0),
+            LayoutMode::Full => Vec2::from(DEFAULT_WINDOW_SIZE),
+            LayoutMode::Lite => Vec2::new(340.0, 250.0),
             LayoutMode::Compact => Vec2::new(200.0, 200.0),
             LayoutMode::Logs => Vec2::new(720.0, 560.0),
         }
@@ -386,7 +390,7 @@ impl HeartRateApp {
 
         let middle_h = (ui.available_height() - 26.0).max(80.0);
         let bpm_block_h = 94.0;
-        let card_h = 100.0;
+        let card_h = 100.0 + SIGNAL_ROW_H;
         let pad_bpm = ((middle_h - bpm_block_h) / 2.0).max(0.0);
         let pad_card = ((middle_h - card_h) / 2.0).max(0.0);
 
@@ -542,7 +546,7 @@ impl HeartRateApp {
                 };
                 (bars, color, text)
             }
-            None => (0, TEXT_LO, "no clean beats yet".to_owned()),
+            None => (0, TEXT_LO, "no clean beats".to_owned()),
         };
 
         ui.add_space(5.0);

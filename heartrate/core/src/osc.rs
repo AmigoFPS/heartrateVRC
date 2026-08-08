@@ -384,11 +384,12 @@ impl OscSender {
     }
 }
 
-fn normalize_hrv(metrics: &HrvMetrics) -> [f32; 3] {
+fn normalize_hrv(metrics: &HrvMetrics) -> [f32; 4] {
     [
         (metrics.rmssd / HRV_MS_FLOAT_SCALE).clamp(0.0, 1.0),
         (metrics.sdnn / HRV_MS_FLOAT_SCALE).clamp(0.0, 1.0),
         (metrics.pnn50 / 100.0).clamp(0.0, 1.0),
+        (1.0 - metrics.artifact_pct / 100.0).clamp(0.0, 1.0),
     ]
 }
 
@@ -417,8 +418,11 @@ mod tests {
             rmssd: 100.0,
             sdnn: 400.0,
             pnn50: 50.0,
+            mean_hr: 60.0,
+            artifact_pct: 10.0,
+            quality: crate::hrv::SignalQuality::Fair,
         };
-        assert_eq!(normalize_hrv(&metrics), [0.5, 1.0, 0.5]);
+        assert_eq!(normalize_hrv(&metrics), [0.5, 1.0, 0.5, 0.9]);
     }
 
     #[test]
@@ -427,8 +431,11 @@ mod tests {
             rmssd: 0.0,
             sdnn: 0.0,
             pnn50: 0.0,
+            mean_hr: 0.0,
+            artifact_pct: 0.0,
+            quality: crate::hrv::SignalQuality::Good,
         };
-        assert_eq!(normalize_hrv(&metrics), [0.0, 0.0, 0.0]);
+        assert_eq!(normalize_hrv(&metrics), [0.0, 0.0, 0.0, 1.0]);
     }
 
     #[test]

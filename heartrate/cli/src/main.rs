@@ -8,7 +8,7 @@ async fn main() {
     let settings = AppSettings::try_load_from_file("settings.json").expect("Unable to load settings");
     let mut host = HeartrateDevice::new().await.expect("Unable to create device");
     let sender = OscSender::new(settings.send_port()).await;
-    let mut hrv_analyzer = HrvAnalyzer::new();
+    let mut hrv_analyzer = HrvAnalyzer::with_filter(settings.hrv_filter());
     let mut state = AppState::Scanning;
 
     loop {
@@ -16,7 +16,7 @@ async fn main() {
             AppState::Scanning => match host.auto_connect().await {
                 Ok(name) => {
                     println!("Found device {}!", name);
-                    hrv_analyzer = HrvAnalyzer::new();
+                    hrv_analyzer = HrvAnalyzer::with_filter(settings.hrv_filter());
                     state = AppState::Sending;
                     continue;
                 }
@@ -37,8 +37,13 @@ async fn main() {
                     if let Some(metrics) = hrv_analyzer.compute() {
                         sender.send_hrv(&metrics, settings.hrv_addresses()).await;
                         println!(
-                            "Sending {} BPM | HRV RMSSD:{:.1} SDNN:{:.1} pNN50:{:.1}",
-                            data.bpm, metrics.rmssd, metrics.sdnn, metrics.pnn50
+                            "Sending {} BPM | HRV RMSSD:{:.1} SDNN:{:.1} pNN50:{:.1} | signal {} ({:.0}% artifacts)",
+                            data.bpm,
+                            metrics.rmssd,
+                            metrics.sdnn,
+                            metrics.pnn50,
+                            metrics.quality.label(),
+                            metrics.artifact_pct
                         );
                     } else {
                         println!("Sending {} BPM", data.bpm);

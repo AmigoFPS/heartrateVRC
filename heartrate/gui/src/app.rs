@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, CornerRadius, FontId, RichText, Sense, Stroke,
 use egui_plot::{Line, Plot};
 
 use crate::{BleEvent, GuiCommand};
-use heartrate_core::hrv::HrvMetrics;
+use heartrate_core::hrv::{HrvMetrics, SignalQuality};
 use heartrate_core::log_buffer;
 use heartrate_core::logger::{self, FullStats, SessionLog, SessionLogger};
 
@@ -26,6 +26,7 @@ const WATER: Color32 = Color32::from_rgb(77, 145, 214);
 const RECHARGE: Color32 = Color32::from_rgb(140, 106, 219);
 const ICON_BG: Color32 = Color32::from_rgb(28, 28, 49);
 const ICON_BG_HOVER: Color32 = Color32::from_rgb(38, 38, 65);
+const TRACK: Color32 = Color32::from_rgb(28, 28, 49);
 
 const MAX_PTS: usize = 600;
 const VIEW_SEC: f64 = 60.0;
@@ -509,6 +510,7 @@ impl HeartRateApp {
                 metric(&mut c[1], "SDNN", &sdnn_str, TEAL);
                 metric(&mut c[2], "pNN50", &pnn50_str, PURPLE);
             });
+            self.render_signal_row(ui);
         });
     }
 
@@ -521,7 +523,40 @@ impl HeartRateApp {
             metric_row_large(ui, "SDNN", &sdnn_str, TEAL);
             ui.add_space(2.0);
             metric_row_large(ui, "pNN50", &pnn50_str, PURPLE);
+            self.render_signal_row(ui);
         });
+    }
+
+    fn render_signal_row(&self, ui: &mut egui::Ui) {
+        let (bars, color, text) = match &self.hrv {
+            Some(m) => {
+                let (bars, color) = match m.quality {
+                    SignalQuality::Good => (3, GREEN),
+                    SignalQuality::Fair => (2, AMBER),
+                    SignalQuality::Poor => (1, RED),
+                };
+                let text = if m.artifact_pct < 0.5 {
+                    m.quality.label().to_owned()
+                } else {
+                    format!("{} · {:.0}%", m.quality.label(), m.artifact_pct)
+                };
+                (bars, color, text)
+            }
+            None => (0, TEXT_LO, "no clean beats yet".to_owned()),
+        };
+
+        ui.add_space(5.0);
+        let (rule, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), Sense::hover());
+        ui.painter().rect_filled(rule, CornerRadius::same(0), CARD_STROKE);
+        ui.add_space(4.0);
+
+        let row = ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            signal_bars(ui, bars, color);
+            ui.label(RichText::new(text).color(color).size(10.0));
+        });
+        row.response
+            .on_hover_text("Share of RR intervals the artifact filter rejected");
     }
 
     fn hrv_strings(&self) -> (String, String, String) {
@@ -1119,6 +1154,13 @@ fn render_full_stats_card(ui: &mut egui::Ui, stats: &FullStats) {
         });
 
         ui.add_space(4.0);
+        ui.label(RichText::new("Signal quality").color(TEXT_LO).size(10.0));
+        ui.columns(2, |c| {
+            metric(&mut c[0], "Rejected avg", &fmt_opt_pct(stats.artifact_avg), AMBER);
+            metric(&mut c[1], "Rejected peak", &fmt_opt_pct(stats.artifact_max), AMBER);
+        });
+
+        ui.add_space(4.0);
         ui.label(RichText::new("HR zones").color(TEXT_LO).size(10.0));
         zone_bar(ui, "Resting (<60)", stats.zones.resting_pct(), GREEN);
         zone_bar(ui, "Light (60–99)", stats.zones.light_pct(), TEAL);
@@ -1212,7 +1254,7 @@ fn zone_bar(ui: &mut egui::Ui, label: &str, pct: f32, color: Color32) {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(bar_w, 8.0), Sense::hover());
             let painter = ui.painter();
             let radius = CornerRadius::same(3);
-            painter.rect_filled(rect, radius, Color32::from_rgb(28, 28, 49));
+            painter.rect_filled(rect, radius, TRACK);
             let fill_w = rect.width() * (pct / 100.0).clamp(0.0, 1.0);
             let fill_rect = egui::Rect::from_min_size(rect.min, Vec2::new(fill_w, rect.height()));
             painter.rect_filled(fill_rect, radius, color);
@@ -1530,6 +1572,24 @@ fn card(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
         .stroke(Stroke::new(1.0, CARD_STROKE))
         .inner_margin(egui::Margin::symmetric(10, 7))
         .show(ui, content);
+}
+
+fn signal_bars(ui: &mut egui::Ui, level: u8, color: Color32) {
+    const COUNT: u8 = 3;
+    const BAR_W: f32 = 3.0;
+    const GAP: f32 = 2.0;
+
+    let size = Vec2::new(COUNT as f32 * BAR_W + (COUNT - 1) as f32 * GAP, 11.0);
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    let painter = ui.painter();
+
+    for i in 0..COUNT {
+        let height = 4.0 + i as f32 * 3.0;
+        let x = rect.left() + i as f32 * (BAR_W + GAP);
+        let bar = egui::Rect::from_min_size(egui::pos2(x, rect.bottom() - height), Vec2::new(BAR_W, height));
+        let fill = if i < level { color } else { TRACK };
+        painter.rect_filled(bar, CornerRadius::same(1), fill);
+    }
 }
 
 fn metric(ui: &mut egui::Ui, label: &str, value: &str, color: Color32) {

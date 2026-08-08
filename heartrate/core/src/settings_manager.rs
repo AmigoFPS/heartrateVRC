@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+use crate::hrv::RrFilter;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AppSettings {
     send_port: u16,
@@ -8,6 +10,8 @@ pub struct AppSettings {
     float_addresses: Vec<String>,
     int_addresses: Vec<String>,
     hrv_addresses: Vec<String>,
+    #[serde(default)]
+    hrv_filter: RrFilter,
 }
 
 impl AppSettings {
@@ -30,6 +34,10 @@ impl AppSettings {
     pub fn hrv_addresses(&self) -> &[String] {
         self.hrv_addresses.as_slice()
     }
+
+    pub fn hrv_filter(&self) -> RrFilter {
+        self.hrv_filter
+    }
 }
 
 impl Default for AppSettings {
@@ -50,7 +58,9 @@ impl Default for AppSettings {
                 "/avatar/parameters/HRV_RMSSD".to_owned(),
                 "/avatar/parameters/HRV_SDNN".to_owned(),
                 "/avatar/parameters/HRV_pNN50".to_owned(),
+                "/avatar/parameters/HRV_Quality".to_owned(),
             ],
+            hrv_filter: RrFilter::default(),
         }
     }
 }
@@ -107,5 +117,46 @@ impl From<std::io::Error> for AppSetttingsError {
 impl From<serde_json::Error> for AppSetttingsError {
     fn from(err: serde_json::Error) -> Self {
         AppSetttingsError::Parse(err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_without_a_filter_block_fall_back_to_the_defaults() {
+        let json = r#"{
+            "send_port": 9000,
+            "correction": 20,
+            "float_addresses": ["/avatar/parameters/Heartrate_OSC"],
+            "int_addresses": ["/avatar/parameters/HR"],
+            "hrv_addresses": [
+                "/avatar/parameters/HRV_RMSSD",
+                "/avatar/parameters/HRV_SDNN",
+                "/avatar/parameters/HRV_pNN50"
+            ]
+        }"#;
+
+        let settings: AppSettings = serde_json::from_str(json).expect("legacy config should still parse");
+        let filter = settings.hrv_filter();
+        assert_eq!(filter.max_rel_change, RrFilter::default().max_rel_change);
+        assert_eq!(settings.hrv_addresses().len(), 3);
+    }
+
+    #[test]
+    fn a_partial_filter_block_keeps_the_remaining_defaults() {
+        let json = r#"{
+            "send_port": 9000,
+            "correction": 0,
+            "float_addresses": [],
+            "int_addresses": [],
+            "hrv_addresses": [],
+            "hrv_filter": { "max_rel_change": 0.25 }
+        }"#;
+
+        let settings: AppSettings = serde_json::from_str(json).expect("partial filter block should parse");
+        assert_eq!(settings.hrv_filter().max_rel_change, 0.25);
+        assert_eq!(settings.hrv_filter().min_rr_ms, RrFilter::default().min_rr_ms);
     }
 }

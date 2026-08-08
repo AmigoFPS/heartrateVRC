@@ -17,6 +17,8 @@ pub struct Sample {
     pub sdnn: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub pnn50: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub artifact_pct: Option<f32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -60,6 +62,7 @@ impl SessionLogger {
             rmssd: hrv.map(|h| h.rmssd),
             sdnn: hrv.map(|h| h.sdnn),
             pnn50: hrv.map(|h| h.pnn50),
+            artifact_pct: hrv.map(|h| h.artifact_pct),
         });
     }
 
@@ -163,6 +166,7 @@ impl SessionLog {
         let (rmssd_avg, rmssd_min, rmssd_max) = stat_minmax_avg(self.samples.iter().filter_map(|s| s.rmssd));
         let (sdnn_avg, sdnn_min, sdnn_max) = stat_minmax_avg(self.samples.iter().filter_map(|s| s.sdnn));
         let (pnn50_avg, pnn50_min, pnn50_max) = stat_minmax_avg(self.samples.iter().filter_map(|s| s.pnn50));
+        let (artifact_avg, _, artifact_max) = stat_minmax_avg(self.samples.iter().filter_map(|s| s.artifact_pct));
 
         let mut zones = HrZones::default();
         for s in &self.samples {
@@ -188,21 +192,24 @@ impl SessionLog {
             pnn50_avg,
             pnn50_min,
             pnn50_max,
+            artifact_avg,
+            artifact_max,
             zones,
         }
     }
 
     pub fn export_csv(&self, path: &Path) -> io::Result<()> {
         let mut out = String::new();
-        out.push_str("t_ms,bpm,rmssd,sdnn,pnn50\n");
+        out.push_str("t_ms,bpm,rmssd,sdnn,pnn50,artifact_pct\n");
         for s in &self.samples {
             out.push_str(&format!(
-                "{},{},{},{},{}\n",
+                "{},{},{},{},{},{}\n",
                 s.t_ms,
                 s.bpm,
                 s.rmssd.map_or(String::new(), |v| format!("{:.3}", v)),
                 s.sdnn.map_or(String::new(), |v| format!("{:.3}", v)),
                 s.pnn50.map_or(String::new(), |v| format!("{:.3}", v)),
+                s.artifact_pct.map_or(String::new(), |v| format!("{:.1}", v)),
             ));
         }
         fs::write(path, out)
@@ -257,6 +264,8 @@ pub struct FullStats {
     pub pnn50_avg: Option<f32>,
     pub pnn50_min: Option<f32>,
     pub pnn50_max: Option<f32>,
+    pub artifact_avg: Option<f32>,
+    pub artifact_max: Option<f32>,
     pub zones: HrZones,
 }
 
@@ -382,6 +391,7 @@ mod tests {
                     rmssd: Some(40.0),
                     sdnn: Some(50.0),
                     pnn50: Some(10.0),
+                    artifact_pct: Some(0.0),
                 },
                 Sample {
                     t_ms: 5_000,
@@ -389,6 +399,7 @@ mod tests {
                     rmssd: Some(50.0),
                     sdnn: Some(60.0),
                     pnn50: Some(20.0),
+                    artifact_pct: Some(4.0),
                 },
                 Sample {
                     t_ms: 10_000,
@@ -396,6 +407,7 @@ mod tests {
                     rmssd: None,
                     sdnn: None,
                     pnn50: None,
+                    artifact_pct: None,
                 },
             ],
         };
@@ -408,6 +420,8 @@ mod tests {
 
         let full = log.full_stats();
         assert!((full.rmssd_avg.unwrap() - 45.0).abs() < 0.001);
+        assert!((full.artifact_avg.unwrap() - 2.0).abs() < 0.001);
+        assert!((full.artifact_max.unwrap() - 4.0).abs() < 0.001);
         assert_eq!(full.zones.resting_count, 0);
         assert_eq!(full.zones.light_count, 2);
         assert_eq!(full.zones.moderate_count, 1);

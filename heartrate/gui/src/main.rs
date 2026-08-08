@@ -79,7 +79,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                 continue;
             }
         };
-        let mut hrv_analyzer = HrvAnalyzer::new();
+        let mut hrv_analyzer = HrvAnalyzer::with_filter(settings.hrv_filter());
         let mut hrv_reset_until: Option<Instant> = None;
         let mut scanning = true;
         let mut session_logger: Option<SessionLogger> = None;
@@ -91,7 +91,7 @@ async fn ble_worker(tx: mpsc::Sender<BleEvent>, rx_cmd: mpsc::Receiver<GuiComman
                 match host.auto_connect().await {
                     Ok(name) => {
                         log::info!("[BLE] Connected to {name}");
-                        hrv_analyzer = HrvAnalyzer::new();
+                        hrv_analyzer.reset();
                         session_logger = Some(SessionLogger::new(name.clone()));
                         let _ = tx.send(BleEvent::Connected(name));
                         scanning = false;

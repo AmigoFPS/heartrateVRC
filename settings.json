@@ -10,6 +10,13 @@
   "hrv_addresses": [
     "/avatar/parameters/HRV_RMSSD",
     "/avatar/parameters/HRV_SDNN",
-    "/avatar/parameters/HRV_pNN50"
-  ]
+    "/avatar/parameters/HRV_pNN50",
+    "/avatar/parameters/HRV_Quality"
+  ],
+  "hrv_filter": {
+    "min_rr_ms": 300.0,
+    "max_rr_ms": 2000.0,
+    "max_rel_change": 0.2,
+    "reference_beats": 5
+  }
 }

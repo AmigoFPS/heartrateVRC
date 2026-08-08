@@ -20,7 +20,7 @@ pub async fn run_worker(settings: AppSettings, tui_tx: watch::Sender<HeartRateDa
             }
         };
 
-        let mut hrv_analyzer = HrvAnalyzer::new();
+        let mut hrv_analyzer = HrvAnalyzer::with_filter(settings.hrv_filter());
         let mut scanning = true;
         log::info!("[BLE] Scanning for a heart rate device...");
 

@@ -3,7 +3,7 @@ resolver = "2"
 members = ["heartrate/*"]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["nullshii", "Amigo_FPS"]

@@ -1,15 +1,15 @@
-use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Color32, CornerRadius, FontId, RichText, Sense, Stroke, Vec2, ViewportCommand};
 use egui_plot::{Line, Plot};
 
-use crate::{BleEvent, GuiCommand};
 use heartrate_core::hrv::{HrvMetrics, SignalQuality};
 use heartrate_core::log_buffer;
-use heartrate_core::logger::{self, FullStats, SessionLog, SessionLogger};
+use heartrate_core::logger::{self, FullStats, SessionLog};
+use heartrate_core::runtime::{DeviceStatus, Runtime};
+use heartrate_vr::Dashboard;
 
 const BG: Color32 = Color32::from_rgb(13, 13, 23);
 const CARD: Color32 = Color32::from_rgb(22, 22, 43);
@@ -28,11 +28,14 @@ const ICON_BG: Color32 = Color32::from_rgb(28, 28, 49);
 const ICON_BG_HOVER: Color32 = Color32::from_rgb(38, 38, 65);
 const TRACK: Color32 = Color32::from_rgb(28, 28, 49);
 
-const MAX_PTS: usize = 600;
 const VIEW_SEC: f64 = 60.0;
 const RESET_HOLD_SECS: f32 = 1.0;
-const RESET_SETTLE_SECS: f32 = 1.0;
-const RESET_BUTTON_COOLDOWN_SECS: f32 = 11.0;
+
+const REPAINT_ACTIVE: Duration = Duration::from_millis(60);
+
+const REPAINT_BACKGROUND: Duration = Duration::from_millis(250);
+
+const REPAINT_HIDDEN: Duration = Duration::from_millis(1000);
 
 const ICON_SIZE: f32 = 26.0;
 
@@ -99,124 +102,97 @@ struct Toast {
     shown_at: Instant,
 }
 
-enum Status {
-    Scanning,
-    Connected(String),
-    Error(String),
-}
-
 pub struct HeartRateApp {
-    rx: Receiver<BleEvent>,
-    tx_cmd: Sender<GuiCommand>,
-    t0: Instant,
-    status: Status,
+    runtime: Arc<Runtime>,
+    dashboard: Arc<Dashboard>,
+    status: DeviceStatus,
     bpm: i32,
     hrv: Option<HrvMetrics>,
-    bpm_hist: VecDeque<[f64; 2]>,
-    rmssd_hist: VecDeque<[f64; 2]>,
+    bpm_pts: Vec<[f64; 2]>,
+    rmssd_pts: Vec<[f64; 2]>,
     last_data_t: f64,
+    reset_cooldown_left: f32,
+    reset_recharge: f32,
+    notice_seq: u64,
+    live_active: bool,
     reset_fill_started: Option<Instant>,
-    reset_suppress_until: Option<Instant>,
-    reset_button_cooldown_until: Option<Instant>,
     mode: LayoutMode,
     previous_mode: LayoutMode,
     pending_resize: bool,
     logs: LogsView,
     toast: Option<Toast>,
-    live_logger: Option<SessionLogger>,
 }
 
 impl HeartRateApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, rx: Receiver<BleEvent>, tx_cmd: Sender<GuiCommand>) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        runtime: Arc<Runtime>,
+        dashboard: Arc<Dashboard>,
+    ) -> Self {
         apply_theme(&cc.egui_ctx);
         Self {
-            rx,
-            tx_cmd,
-            t0: Instant::now(),
-            status: Status::Scanning,
+            runtime,
+            dashboard,
+            status: DeviceStatus::Scanning,
             bpm: 0,
             hrv: None,
-            bpm_hist: VecDeque::with_capacity(MAX_PTS),
-            rmssd_hist: VecDeque::with_capacity(MAX_PTS),
+            bpm_pts: Vec::new(),
+            rmssd_pts: Vec::new(),
             last_data_t: 0.0,
+            reset_cooldown_left: 0.0,
+            reset_recharge: 1.0,
+            notice_seq: 0,
+            live_active: false,
             reset_fill_started: None,
-            reset_suppress_until: None,
-            reset_button_cooldown_until: None,
             mode: LayoutMode::Full,
             previous_mode: LayoutMode::Full,
             pending_resize: false,
             logs: LogsView::default(),
             toast: None,
-            live_logger: None,
         }
     }
 
     fn now(&self) -> f64 {
-        self.t0.elapsed().as_secs_f64()
+        self.runtime.elapsed_secs()
     }
 
-    fn poll(&mut self) {
-        let t = self.now();
-        while let Ok(ev) = self.rx.try_recv() {
-            match ev {
-                BleEvent::Scanning => {
-                    self.status = Status::Scanning;
-                    self.bpm = 0;
-                }
-                BleEvent::Connected(name) => {
-                    self.status = Status::Connected(name.clone());
-                    self.live_logger = Some(SessionLogger::new(name));
-                }
-                BleEvent::Disconnected => {
-                    self.status = Status::Scanning;
-                    self.bpm = 0;
-                    self.live_logger = None;
-                    if self.logs.selected == SelectedLog::Live {
-                        self.logs.selected = SelectedLog::None;
-                    }
-                }
-                BleEvent::Data { bpm, hrv } => {
-                    self.bpm = bpm;
-                    self.last_data_t = t;
-                    self.bpm_hist.push_back([t, bpm as f64]);
-                    let suppress_hrv = self.reset_suppress_until.is_some_and(|until| Instant::now() < until);
-                    let shown_hrv = if suppress_hrv { None } else { hrv };
-                    if let Some(ref m) = shown_hrv {
-                        self.rmssd_hist.push_back([t, m.rmssd as f64]);
-                    }
-                    if let Some(ref mut logger) = self.live_logger {
-                        logger.record(bpm.max(0) as u16, shown_hrv.as_ref());
-                    }
-                    self.hrv = shown_hrv;
-                    while self.bpm_hist.len() > MAX_PTS {
-                        self.bpm_hist.pop_front();
-                    }
-                    while self.rmssd_hist.len() > MAX_PTS {
-                        self.rmssd_hist.pop_front();
-                    }
-                }
-                BleEvent::FatalError(msg) => self.status = Status::Error(msg),
-                BleEvent::LogSaved(path) => {
-                    let name = path
-                        .file_name()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("session")
-                        .to_owned();
-                    self.show_toast(format!("Log saved: {}", name), false);
-                    self.logs.scanned = false;
-                }
-                BleEvent::LogError(msg) => {
-                    self.show_toast(format!("Log error: {}", msg), true);
-                }
+    fn sync(&mut self, want_plots: bool) {
+        let now = Instant::now();
+        let notice = self.runtime.read(|snap| {
+            self.status = snap.device.clone();
+            self.bpm = snap.bpm;
+            self.hrv = snap.hrv;
+            self.last_data_t = snap.last_data_t;
+            self.reset_cooldown_left = snap.reset_cooldown_secs(now);
+            self.reset_recharge = snap.reset_recharge(now);
+
+            if want_plots {
+                self.bpm_pts.clear();
+                self.bpm_pts.extend(snap.bpm_history.iter().copied());
+                self.rmssd_pts.clear();
+                self.rmssd_pts.extend(snap.rmssd_history.iter().copied());
+            }
+
+            snap.notice
+                .as_ref()
+                .map(|n| (n.seq, n.text.clone(), n.is_error))
+        });
+
+        let live_active = self.runtime.has_live_session();
+        if !live_active && self.live_active && self.logs.selected == SelectedLog::Live {
+            self.logs.selected = SelectedLog::None;
+        }
+        self.live_active = live_active;
+
+        if let Some((seq, text, is_error)) = notice
+            && seq != self.notice_seq
+        {
+            self.notice_seq = seq;
+            self.show_toast(text, is_error);
+            if !is_error {
+                self.logs.scanned = false;
             }
         }
-    }
-
-    fn on_hrv_reset(&mut self) {
-        self.hrv = None;
-        self.rmssd_hist.clear();
-        self.reset_suppress_until = Some(Instant::now() + Duration::from_secs_f32(RESET_SETTLE_SECS));
-        self.reset_button_cooldown_until = Some(Instant::now() + Duration::from_secs_f32(RESET_BUTTON_COOLDOWN_SECS));
     }
 
     fn set_mode(&mut self, mode: LayoutMode) {
@@ -241,10 +217,10 @@ impl HeartRateApp {
             Ok(files) => {
                 self.logs.files = files;
                 self.logs.selected = match std::mem::take(&mut self.logs.selected) {
-                    SelectedLog::Live if self.live_logger.is_some() => SelectedLog::Live,
+                    SelectedLog::Live if self.live_active => SelectedLog::Live,
                     SelectedLog::File(p) if self.logs.files.iter().any(|f| f == &p) => SelectedLog::File(p),
                     _ => {
-                        if self.live_logger.is_some() {
+                        if self.live_active {
                             SelectedLog::Live
                         } else if let Some(first) = self.logs.files.first() {
                             SelectedLog::File(first.clone())
@@ -280,7 +256,7 @@ impl HeartRateApp {
 
     fn current_log_for_view(&self) -> Option<SessionLog> {
         match &self.logs.selected {
-            SelectedLog::Live => self.live_logger.as_ref().map(|l| l.snapshot()),
+            SelectedLog::Live => self.runtime.live_log(),
             SelectedLog::File(_) => self.logs.loaded.clone(),
             SelectedLog::None => None,
         }
@@ -291,7 +267,8 @@ impl eframe::App for HeartRateApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
 
-        self.poll();
+        let mode = self.mode;
+        self.sync(mode == LayoutMode::Full);
         let t = self.now();
         let plot_t = if self.last_data_t > 0.0 { self.last_data_t } else { t };
 
@@ -301,8 +278,6 @@ impl eframe::App for HeartRateApp {
             ctx.send_viewport_cmd(ViewportCommand::InnerSize(size));
             self.pending_resize = false;
         }
-
-        let mode = self.mode;
 
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(BG).inner_margin(8.0))
@@ -323,7 +298,27 @@ impl eframe::App for HeartRateApp {
                 self.render_toast(ui);
             });
 
-        ctx.request_repaint_after(Duration::from_millis(60));
+        ctx.request_repaint_after(self.repaint_interval(&ctx));
+    }
+}
+
+impl HeartRateApp {
+    fn repaint_interval(&self, ctx: &egui::Context) -> Duration {
+        let (focused, minimized) = ctx.input(|i| {
+            let viewport = i.viewport();
+            (
+                viewport.focused.unwrap_or(true),
+                viewport.minimized.unwrap_or(false),
+            )
+        });
+
+        if minimized {
+            REPAINT_HIDDEN
+        } else if focused {
+            REPAINT_ACTIVE
+        } else {
+            REPAINT_BACKGROUND
+        }
     }
 }
 
@@ -348,7 +343,7 @@ impl HeartRateApp {
             next = Some(LayoutMode::Lite);
         }
 
-        let bpm_pts: Vec<[f64; 2]> = self.bpm_hist.iter().copied().collect();
+        let bpm_pts = std::mem::take(&mut self.bpm_pts);
         dark_plot(ui, "bpm", plot_t, 110.0, 40.0, 180.0, |plot_ui| {
             plot_ui.line(
                 Line::new("BPM", egui_plot::PlotPoints::from(bpm_pts))
@@ -358,7 +353,7 @@ impl HeartRateApp {
         });
 
         ui.label(RichText::new("HRV · RMSSD").color(TEXT_LO).size(10.0));
-        let rmssd_pts: Vec<[f64; 2]> = self.rmssd_hist.iter().copied().collect();
+        let rmssd_pts = std::mem::take(&mut self.rmssd_pts);
         dark_plot(ui, "rmssd", plot_t, 110.0, 0.0, 120.0, |plot_ui| {
             plot_ui.line(
                 Line::new("RMSSD", egui_plot::PlotPoints::from(rmssd_pts))
@@ -379,7 +374,7 @@ impl HeartRateApp {
                 next = Some(LayoutMode::Logs);
             }
             if icon_btn(ui, IconKind::Save, "Save current session").clicked() {
-                let _ = self.tx_cmd.send(GuiCommand::SaveLog);
+                self.runtime.save_log();
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if chevron_btn(ui, ChevronDir::Left).clicked() {
@@ -446,7 +441,7 @@ impl HeartRateApp {
                 next = Some(LayoutMode::Logs);
             }
             if icon_btn(ui, IconKind::Save, "Save current session").clicked() {
-                let _ = self.tx_cmd.send(GuiCommand::SaveLog);
+                self.runtime.save_log();
             }
             if let Some((dir, target)) = right_chevron {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -492,12 +487,12 @@ impl HeartRateApp {
 
     fn render_status_dot(&self, ui: &mut egui::Ui) {
         let (dot, txt) = match &self.status {
-            Status::Scanning => (AMBER, "searching…".to_owned()),
-            Status::Connected(n) => {
+            DeviceStatus::Scanning => (AMBER, "searching…".to_owned()),
+            DeviceStatus::Connected(n) => {
                 let label = if n.is_empty() { "connected".into() } else { n.clone() };
                 (GREEN, label)
             }
-            Status::Error(m) => (RED, m.clone()),
+            DeviceStatus::Error(m) => (RED, m.clone()),
         };
         ui.horizontal(|ui| {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
@@ -574,17 +569,9 @@ impl HeartRateApp {
         let size = Vec2::new(ICON_SIZE, ICON_SIZE);
         let (rect, response) = ui.allocate_exact_size(size, Sense::click_and_drag());
 
-        let cooldown_left = self
-            .reset_button_cooldown_until
-            .map(|until| (until - Instant::now()).as_secs_f32())
-            .unwrap_or(0.0)
-            .max(0.0);
+        let cooldown_left = self.reset_cooldown_left;
         let is_in_cooldown = cooldown_left > 0.0;
-        let recharge_progress = if is_in_cooldown {
-            1.0 - (cooldown_left / RESET_BUTTON_COOLDOWN_SECS).clamp(0.0, 1.0)
-        } else {
-            1.0
-        };
+        let recharge_progress = self.reset_recharge;
         let is_holding = response.hovered() && ui.input(|i| i.pointer.primary_down());
         if is_in_cooldown {
             self.reset_fill_started = None;
@@ -603,8 +590,7 @@ impl HeartRateApp {
         };
 
         if fill >= 1.0 {
-            let _ = self.tx_cmd.send(GuiCommand::ResetHrv);
-            self.on_hrv_reset();
+            self.runtime.reset_hrv();
             self.reset_fill_started = None;
         }
 
@@ -709,6 +695,7 @@ impl HeartRateApp {
             open_path(&dir);
         }
 
+        self.render_steamvr_row(ui);
         ui.separator();
 
         if self.logs.show_debug {
@@ -747,10 +734,53 @@ impl HeartRateApp {
             self.export_selected_csv();
         }
         if want_save_live {
-            let _ = self.tx_cmd.send(GuiCommand::SaveLog);
+            self.runtime.save_log();
         }
 
         next
+    }
+
+    fn render_steamvr_row(&mut self, ui: &mut egui::Ui) {
+        let status = self.dashboard.status();
+
+        let (dot, text) = if status.tab_ready {
+            (
+                GREEN,
+                format!("dashboard tab ready · SteamVR {}", status.runtime_version),
+            )
+        } else if status.connected {
+            (AMBER, "connected, waiting for a dashboard tab".to_owned())
+        } else {
+            match &status.error {
+                Some(_) => (TEXT_LO, "not running".to_owned()),
+                None => (TEXT_LO, "looking for SteamVR…".to_owned()),
+            }
+        };
+
+        ui.horizontal(|ui| {
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), Sense::hover());
+            ui.painter().circle_filled(rect.center(), 3.5, dot);
+            ui.label(RichText::new("SteamVR").color(TEXT_HI).size(10.0).strong());
+            ui.label(RichText::new(text).color(TEXT_LO).size(10.0));
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let on = status.auto_launch;
+                let style = if on { ButtonStyle::Primary } else { ButtonStyle::Neutral };
+                let resp = pill_btn(ui, "Start with SteamVR", TEXT_HI, style, status.connected);
+                if resp.clicked() && status.connected {
+                    self.dashboard.set_auto_launch(!on);
+                }
+                resp.on_hover_text(if status.connected {
+                    "Have SteamVR launch this application whenever it starts"
+                } else {
+                    "Needs SteamVR to be running"
+                });
+            });
+        });
+
+        if let Some(error) = status.error.as_ref().filter(|_| !status.tab_ready) {
+            ui.label(RichText::new(error.clone()).color(TEXT_LO).size(9.0));
+        }
     }
 
     fn render_debug_log(&mut self, ui: &mut egui::Ui) {
@@ -845,7 +875,7 @@ impl HeartRateApp {
     }
 
     fn render_logs_list(&mut self, ui: &mut egui::Ui) {
-        let live_active = self.live_logger.is_some();
+        let live_active = self.live_active;
         let total = self.logs.files.len() + if live_active { 1 } else { 0 };
         ui.label(RichText::new(format!("{} session(s)", total)).color(TEXT_LO).size(10.0));
         ui.add_space(4.0);
@@ -862,7 +892,7 @@ impl HeartRateApp {
                 ui.spacing_mut().item_spacing = Vec2::new(0.0, 6.0);
 
                 if live_active {
-                    let snapshot = self.live_logger.as_ref().map(|l| l.snapshot());
+                    let snapshot = self.runtime.live_log();
                     let (subtitle, sample_count) = match snapshot {
                         Some(s) => (
                             format!(

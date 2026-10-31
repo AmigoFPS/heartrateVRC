@@ -31,6 +31,7 @@ impl std::fmt::Display for LogLine {
 static BUFFER: OnceLock<Mutex<VecDeque<LogLine>>> = OnceLock::new();
 static START: OnceLock<Instant> = OnceLock::new();
 static VERBOSE: AtomicBool = AtomicBool::new(false);
+static ECHO: AtomicBool = AtomicBool::new(false);
 static LOGGER: BufferLogger = BufferLogger;
 
 struct BufferLogger;
@@ -44,11 +45,15 @@ impl Log for BufferLogger {
         if !self.enabled(record.metadata()) {
             return;
         }
-        push(LogLine {
+        let line = LogLine {
             t_ms: start().elapsed().as_millis() as u64,
             level: record.level(),
             message: record.args().to_string(),
-        });
+        };
+        if ECHO.load(Ordering::Relaxed) {
+            eprintln!("{line}");
+        }
+        push(line);
     }
 
     fn flush(&self) {}
@@ -89,6 +94,10 @@ pub fn set_verbose(verbose: bool) {
 
 pub fn is_verbose() -> bool {
     VERBOSE.load(Ordering::Relaxed)
+}
+
+pub fn set_echo(echo: bool) {
+    ECHO.store(echo, Ordering::Relaxed);
 }
 
 pub fn snapshot() -> Vec<LogLine> {

@@ -1,35 +1,36 @@
 pub mod app;
-pub mod data;
 pub mod event;
 pub mod page;
 pub mod tui;
 pub mod ui;
 pub mod update;
-pub mod worker;
 
 use std::error::Error;
 
+use heartrate_core::runtime::Runtime;
 use heartrate_core::{log_buffer, settings_manager::AppSettings};
 use ratatui::{Terminal, prelude::CrosstermBackend};
-use tokio::sync::watch;
 
 use crate::{
     app::App,
-    data::HeartRateData,
     event::{Event, EventHandler},
     tui::Tui,
-    worker::run_worker,
 };
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     if let Err(e) = log_buffer::init() {
         eprintln!("TUI logger error: {}", e);
     }
 
-    let settings = AppSettings::try_load_from_file("settings.json").expect("Unable to load settings");
+    let settings = match AppSettings::load_or_create() {
+        Ok(settings) => settings,
+        Err(e) => {
+            eprintln!("Could not load the settings: {e}; using the defaults");
+            AppSettings::default()
+        }
+    };
 
-    let (tui_tx, tui_rx) = watch::channel(HeartRateData::default());
+    let runtime = Runtime::start(settings);
 
     let mut app = App::new();
     let backend = CrosstermBackend::new(std::io::stderr());
@@ -38,15 +39,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut tui = Tui::new(terminal, events);
     tui.enter()?;
 
-    tokio::spawn(async move {
-        run_worker(settings, tui_tx).await;
-    });
-
+    let mut seen_revision = 0;
     while !app.should_quit {
-        {
-            let current_data = tui_rx.borrow();
-            app.update_metrics(current_data.bpm, current_data.hrv.as_ref());
+        let revision = runtime.revision();
+        if revision != seen_revision {
+            seen_revision = revision;
+            let (bpm, hrv) = runtime.read(|snap| (snap.bpm.max(0) as u16, snap.hrv));
+            app.update_metrics(bpm, hrv.as_ref());
         }
+
         tui.draw(&mut app)?;
 
         match tui.events.next()? {
@@ -57,6 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    runtime.request_shutdown();
     tui.exit()?;
     Ok(())
 }

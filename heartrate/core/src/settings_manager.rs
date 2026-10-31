@@ -1,7 +1,27 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::hrv::RrFilter;
+
+pub const SETTINGS_FILE: &str = "settings.json";
+
+pub fn default_settings_path() -> PathBuf {
+    let beside_exe = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(SETTINGS_FILE)));
+
+    if let Some(path) = beside_exe.as_ref().filter(|p| p.is_file()) {
+        return path.clone();
+    }
+
+    let in_cwd = PathBuf::from(SETTINGS_FILE);
+    if in_cwd.is_file() {
+        return in_cwd;
+    }
+
+    beside_exe.unwrap_or(in_cwd)
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AppSettings {
@@ -66,7 +86,11 @@ impl Default for AppSettings {
 }
 
 impl AppSettings {
-    pub fn try_load_from_file(path: &str) -> Result<Self, AppSetttingsError> {
+    pub fn load_or_create() -> Result<Self, AppSetttingsError> {
+        Self::try_load_from_file(&default_settings_path())
+    }
+
+    pub fn try_load_from_file(path: &Path) -> Result<Self, AppSetttingsError> {
         Self::load_from_file(path).or_else(|err| match err {
             AppSetttingsError::Io(ref io_err) => match io_err.kind() {
                 std::io::ErrorKind::NotFound => {
@@ -80,14 +104,17 @@ impl AppSettings {
         })
     }
 
-    pub fn load_from_file(path: &str) -> Result<Self, AppSetttingsError> {
+    pub fn load_from_file(path: &Path) -> Result<Self, AppSetttingsError> {
         let data = fs::read_to_string(path)?;
         let config = serde_json::from_str(&data)?;
         Ok(config)
     }
 
-    pub fn save_to_file(&self, path: &str) -> Result<(), AppSetttingsError> {
+    pub fn save_to_file(&self, path: &Path) -> Result<(), AppSetttingsError> {
         let data = serde_json::to_string_pretty(self)?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
         fs::write(path, data)?;
         Ok(())
     }
@@ -158,5 +185,16 @@ mod tests {
         let settings: AppSettings = serde_json::from_str(json).expect("partial filter block should parse");
         assert_eq!(settings.hrv_filter().max_rel_change, 0.25);
         assert_eq!(settings.hrv_filter().min_rr_ms, RrFilter::default().min_rr_ms);
+    }
+
+    #[test]
+    fn the_settings_path_is_absolute_so_the_working_directory_cannot_move_it() {
+        let path = default_settings_path();
+        assert!(
+            path.is_absolute() || path == Path::new(SETTINGS_FILE),
+            "unexpected settings path: {}",
+            path.display()
+        );
+        assert_eq!(path.file_name().unwrap(), SETTINGS_FILE);
     }
 }

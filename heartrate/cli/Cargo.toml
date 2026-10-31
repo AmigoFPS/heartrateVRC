@@ -9,4 +9,3 @@ license.workspace = true
 [dependencies]
 heartrate_core.workspace = true
 
-tokio = { workspace = true }

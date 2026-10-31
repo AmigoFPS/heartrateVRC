@@ -3,4 +3,5 @@ pub mod hrv;
 pub mod log_buffer;
 pub mod logger;
 pub mod osc;
+pub mod runtime;
 pub mod settings_manager;

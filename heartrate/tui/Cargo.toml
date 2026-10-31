@@ -9,7 +9,6 @@ license.workspace = true
 [dependencies]
 heartrate_core.workspace = true
 
-tokio = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 color-eyre = { workspace = true }

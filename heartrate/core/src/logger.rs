@@ -90,8 +90,7 @@ impl SessionLogger {
         let timestamp = format_filename_timestamp(self.started_at_unix_ms);
         let filename = format!("session_{}.json", timestamp);
         let path = log_dir.join(filename);
-        let json =
-            serde_json::to_string_pretty(&self.snapshot()).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(&self.snapshot()).map_err(|e| io::Error::other(e))?;
         fs::write(&path, json)?;
         Ok(path)
     }

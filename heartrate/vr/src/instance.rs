@@ -1,6 +1,8 @@
 pub struct InstanceLock {
     #[cfg(windows)]
     handle: windows::Win32::Foundation::HANDLE,
+    #[cfg(not(windows))]
+    _file:  std::fs::File,
 }
 
 impl InstanceLock {
@@ -30,8 +32,28 @@ impl InstanceLock {
     }
 
     #[cfg(not(windows))]
-    pub fn acquire(_key: &str) -> Option<Self> {
-        Some(Self {})
+    pub fn acquire(key: &str) -> Option<Self> {
+        let safe: String = key
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '.' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let path = std::env::temp_dir().join(format!("heartrate-osc.{safe}.lock"));
+
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(path)
+            .ok()?;
+        file.try_lock().ok()?;
+
+        Some(Self { _file: file })
     }
 }
 

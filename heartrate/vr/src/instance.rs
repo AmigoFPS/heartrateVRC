@@ -1,4 +1,3 @@
-
 pub struct InstanceLock {
     #[cfg(windows)]
     handle: windows::Win32::Foundation::HANDLE,
@@ -7,13 +6,15 @@ pub struct InstanceLock {
 impl InstanceLock {
     #[cfg(windows)]
     pub fn acquire(key: &str) -> Option<Self> {
-        use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
-        use windows::Win32::System::Threading::CreateMutexW;
-        use windows::core::PCWSTR;
+        use windows::{
+            Win32::{
+                Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError},
+                System::Threading::CreateMutexW,
+            },
+            core::PCWSTR,
+        };
 
-        let name: Vec<u16> = format!("Local\\heartrate-osc.{key}\0")
-            .encode_utf16()
-            .collect();
+        let name: Vec<u16> = format!("Local\\heartrate-osc.{key}\0").encode_utf16().collect();
 
         let handle = unsafe { CreateMutexW(None, false, PCWSTR(name.as_ptr())) }.ok()?;
 
@@ -51,10 +52,7 @@ mod tests {
     fn a_second_lock_on_the_same_key_is_refused() {
         let key = "test.second.lock.refused";
         let first = InstanceLock::acquire(key).expect("the first copy should get it");
-        assert!(
-            InstanceLock::acquire(key).is_none(),
-            "a second copy must not get the same key"
-        );
+        assert!(InstanceLock::acquire(key).is_none(), "a second copy must not get the same key");
 
         drop(first);
         assert!(

@@ -1,14 +1,17 @@
-use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use rosc::{OscMessage, OscPacket, OscType};
 use serde::Deserialize;
-use tokio::net::UdpSocket;
-use tokio::task::JoinHandle;
+use tokio::{net::UdpSocket, task::JoinHandle};
 
 use crate::hrv::HrvMetrics;
 
@@ -174,8 +177,7 @@ async fn rescan(inner: &Arc<ClientInner>) {
                 log::debug!("[OSC] Skipping mDNS candidate {ip}:{port} (not a local address)");
                 continue;
             }
-            if !ip.is_loopback()
-                && check_endpoint(inner, SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)).await
+            if !ip.is_loopback() && check_endpoint(inner, SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)).await
             {
                 return;
             }
@@ -214,11 +216,7 @@ async fn check_endpoint(inner: &Arc<ClientInner>, http_addr: SocketAddr) -> bool
         .is_none_or(|a| a.http_addr != http_addr || a.osc_port != info.osc_port);
 
     if is_new {
-        log::info!(
-            "[OSC] VRChat found at {http_addr} (OSC {}:{})",
-            info.osc_ip,
-            info.osc_port
-        );
+        log::info!("[OSC] VRChat found at {http_addr} (OSC {}:{})", info.osc_ip, info.osc_port);
     }
 
     if let Ok(mut slot) = inner.address.write() {
@@ -232,7 +230,10 @@ async fn check_endpoint(inner: &Arc<ClientInner>, http_addr: SocketAddr) -> bool
 }
 
 fn local_addresses() -> Vec<IpAddr> {
-    let mut out = vec![IpAddr::V4(Ipv4Addr::LOCALHOST), IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)];
+    let mut out = vec![
+        IpAddr::V4(Ipv4Addr::LOCALHOST),
+        IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+    ];
     if let Ok(ifaces) = if_addrs::get_if_addrs() {
         out.extend(ifaces.into_iter().map(|i| i.ip()));
     }
@@ -355,10 +356,7 @@ impl OscSender {
             }
             None => {
                 if !self.on_fallback.swap(true, Ordering::Relaxed) {
-                    log::warn!(
-                        "[OSC] VRChat not discovered yet; sending to default {}",
-                        self.fallback
-                    );
+                    log::warn!("[OSC] VRChat not discovered yet; sending to default {}", self.fallback);
                 }
                 Some(self.fallback.clone())
             }

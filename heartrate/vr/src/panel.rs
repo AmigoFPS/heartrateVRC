@@ -1,12 +1,15 @@
-
 use std::time::{Duration, Instant};
 
-use heartrate_core::hrv::{HrvMetrics, SignalQuality};
-use heartrate_core::runtime::{DeviceStatus, Snapshot};
+use heartrate_core::{
+    hrv::{HrvMetrics, SignalQuality},
+    runtime::{DeviceStatus, Snapshot},
+};
 
-use crate::render::canvas::{Align, Canvas, GraphStyle};
-use crate::render::text::FontSet;
-use crate::render::Color;
+use crate::render::{
+    Color,
+    canvas::{Align, Canvas, GraphStyle},
+    text::FontSet,
+};
 
 pub const DESIGN_WIDTH: u32 = 1024;
 pub const DESIGN_HEIGHT: u32 = 576;
@@ -209,10 +212,7 @@ impl Live {
             || !snap.device.is_connected();
 
         let (status, status_color) = match &snap.device {
-            DeviceStatus::Connected(name) if stale => (
-                format!("{}: no data", short_device(name)),
-                AMBER,
-            ),
+            DeviceStatus::Connected(name) if stale => (format!("{}: no data", short_device(name)), AMBER),
             DeviceStatus::Connected(name) => (short_device(name), GREEN),
             DeviceStatus::Scanning => ("searching…".to_owned(), AMBER),
             DeviceStatus::Error(message) => (short_error(message), RED),
@@ -272,11 +272,7 @@ fn quantise(v: f32) -> f32 {
 
 const HOLD_SLOTS: usize = 4;
 
-fn series(
-    history: &std::collections::VecDeque<[f64; 2]>,
-    now_t: f64,
-    range: (f32, f32),
-) -> Vec<Option<f32>> {
+fn series(history: &std::collections::VecDeque<[f64; 2]>, now_t: f64, range: (f32, f32)) -> Vec<Option<f32>> {
     if history.is_empty() {
         return Vec::new();
     }
@@ -401,8 +397,7 @@ impl Panel {
         }
 
         if let Some(started) = self.hold_started {
-            let progress =
-                (now.saturating_duration_since(started).as_secs_f32() / HOLD_SECS).clamp(0.0, 1.0);
+            let progress = (now.saturating_duration_since(started).as_secs_f32() / HOLD_SECS).clamp(0.0, 1.0);
             if quantise(progress) != quantise(self.hold_progress) {
                 self.hold_progress = progress;
                 self.dirty = true;
@@ -499,15 +494,7 @@ pub fn draw(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
     let radius = 20.0 * s;
 
     canvas.fill_rounded_rect(0.0, 0.0, m.width, m.height, radius, Color { a: 0xF7, ..BG });
-    canvas.stroke_rounded_rect(
-        s,
-        s,
-        m.width - 2.0 * s,
-        m.height - 2.0 * s,
-        radius,
-        2.0 * s,
-        CARD_STROKE,
-    );
+    canvas.stroke_rounded_rect(s, s, m.width - 2.0 * s, m.height - 2.0 * s, radius, 2.0 * s, CARD_STROKE);
 
     draw_header(canvas, font, panel);
     draw_hero(canvas, font, panel);
@@ -541,12 +528,7 @@ fn draw_header(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
         Align::Right,
         false,
     );
-    canvas.fill_circle(
-        right - width - 16.0 * s,
-        m.header.center_y(),
-        6.0 * s,
-        panel.live.status_color,
-    );
+    canvas.fill_circle(right - width - 16.0 * s, m.header.center_y(), 6.0 * s, panel.live.status_color);
 }
 
 fn draw_hero(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
@@ -561,26 +543,8 @@ fn draw_hero(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
         Some(bpm) => (bpm.to_string(), 100.0 * s, TEXT_HI),
         None => ("—".to_owned(), 56.0 * s, TEXT_LO),
     };
-    canvas.draw_text(
-        font,
-        &text,
-        cx,
-        m.hero.y + 150.0 * s,
-        px,
-        color,
-        Align::Center,
-        true,
-    );
-    canvas.draw_text(
-        font,
-        "BPM",
-        cx,
-        m.hero.y + 180.0 * s,
-        20.0 * s,
-        TEXT_LO,
-        Align::Center,
-        false,
-    );
+    canvas.draw_text(font, &text, cx, m.hero.y + 150.0 * s, px, color, Align::Center, true);
+    canvas.draw_text(font, "BPM", cx, m.hero.y + 180.0 * s, 20.0 * s, TEXT_LO, Align::Center, false);
 }
 
 fn draw_hrv(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
@@ -610,42 +574,17 @@ fn draw_hrv(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
 
     for (i, (label, value, color, percent)) in columns.into_iter().enumerate() {
         let cx = rect.x + pad + column_w * (i as f32 + 0.5);
-        canvas.draw_text(
-            font,
-            label,
-            cx,
-            rect.y + 76.0 * s,
-            22.0 * s,
-            TEXT_LO,
-            Align::Center,
-            false,
-        );
+        canvas.draw_text(font, label, cx, rect.y + 76.0 * s, 22.0 * s, TEXT_LO, Align::Center, false);
         let text = match value {
             Some(v) if percent => format!("{v:.1}%"),
             Some(v) => format!("{v:.1}"),
             None => "—".to_owned(),
         };
         let shown = if value.is_some() { color } else { TEXT_LO };
-        canvas.draw_text(
-            font,
-            &text,
-            cx,
-            rect.y + 124.0 * s,
-            44.0 * s,
-            shown,
-            Align::Center,
-            true,
-        );
+        canvas.draw_text(font, &text, cx, rect.y + 124.0 * s, 44.0 * s, shown, Align::Center, true);
     }
 
-    canvas.fill_rounded_rect(
-        rect.x + pad,
-        rect.y + 146.0 * s,
-        rect.w - pad * 2.0,
-        1.0 * s,
-        0.0,
-        CARD_STROKE,
-    );
+    canvas.fill_rounded_rect(rect.x + pad, rect.y + 146.0 * s, rect.w - pad * 2.0, 1.0 * s, 0.0, CARD_STROKE);
 
     let (bars, color, text) = match panel.live.quality {
         Some((quality, artifacts)) => {
@@ -667,16 +606,7 @@ fn draw_hrv(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
     let bar_x = rect.x + pad;
     let bar_bottom = rect.y + 178.0 * s;
     draw_signal_bars(canvas, bar_x, bar_bottom, s, bars, color);
-    canvas.draw_text(
-        font,
-        &text,
-        bar_x + 42.0 * s,
-        bar_bottom,
-        20.0 * s,
-        color,
-        Align::Left,
-        false,
-    );
+    canvas.draw_text(font, &text, bar_x + 42.0 * s, bar_bottom, 20.0 * s, color, Align::Left, false);
 }
 
 fn draw_signal_bars(canvas: &mut Canvas, x: f32, bottom: f32, s: f32, filled: u32, color: Color) {
@@ -689,14 +619,7 @@ fn draw_signal_bars(canvas: &mut Canvas, x: f32, bottom: f32, s: f32, filled: u3
         } else {
             CARD_STROKE.mix(TEXT_LO, 0.45)
         };
-        canvas.fill_rounded_rect(
-            x + (bar_w + gap) * i as f32,
-            bottom - h,
-            bar_w,
-            h,
-            1.5 * s,
-            shown,
-        );
+        canvas.fill_rounded_rect(x + (bar_w + gap) * i as f32, bottom - h, bar_w, h, 1.5 * s, shown);
     }
 }
 
@@ -850,14 +773,7 @@ struct ButtonState {
     fill: Option<(f32, Color)>,
 }
 
-fn draw_button(
-    canvas: &mut Canvas,
-    font: &mut FontSet,
-    s: f32,
-    rect: Rect,
-    label: &str,
-    state: ButtonState,
-) {
+fn draw_button(canvas: &mut Canvas, font: &mut FontSet, s: f32, rect: Rect, label: &str, state: ButtonState) {
     let radius = 8.0 * s;
     let base = match (state.enabled, state.pressed, state.hover) {
         (false, _, _) => Color::rgb(0x1A, 0x1A, 0x30),
@@ -909,23 +825,10 @@ fn draw_notice(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
     let px = 20.0 * s;
     let width = font.measure(text, px, false) + 28.0 * s;
     let height = 40.0 * s;
-    let rect = Rect::new(
-        m.footer.x,
-        m.footer.y - height - 8.0 * s,
-        width.min(m.footer.w),
-        height,
-    );
+    let rect = Rect::new(m.footer.x, m.footer.y - height - 8.0 * s, width.min(m.footer.w), height);
 
     canvas.fill_rounded_rect(rect.x, rect.y, rect.w, rect.h, 8.0 * s, CARD.fade(alpha));
-    canvas.stroke_rounded_rect(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        8.0 * s,
-        1.0 * s,
-        CARD_STROKE.fade(alpha),
-    );
+    canvas.stroke_rounded_rect(rect.x, rect.y, rect.w, rect.h, 8.0 * s, 1.0 * s, CARD_STROKE.fade(alpha));
     canvas.draw_text(
         font,
         text,
@@ -946,8 +849,9 @@ fn card(canvas: &mut Canvas, rect: Rect, s: f32) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::VecDeque;
+
+    use super::*;
 
     fn panel() -> Panel {
         Panel::new(DESIGN_WIDTH, DESIGN_HEIGHT)
@@ -968,8 +872,16 @@ mod tests {
     fn the_layout_stays_inside_the_texture() {
         let m = Metrics::new(DESIGN_WIDTH as f32, DESIGN_HEIGHT as f32);
         for rect in [
-            m.header, m.hero, m.hrv, m.bpm_label, m.bpm_plot, m.rmssd_label, m.rmssd_plot,
-            m.footer, m.reset, m.save,
+            m.header,
+            m.hero,
+            m.hrv,
+            m.bpm_label,
+            m.bpm_plot,
+            m.rmssd_label,
+            m.rmssd_plot,
+            m.footer,
+            m.reset,
+            m.save,
         ] {
             assert!(rect.x >= 0.0 && rect.y >= 0.0, "{rect:?} starts off-texture");
             assert!(
@@ -994,14 +906,8 @@ mod tests {
     fn hit_testing_finds_the_buttons_and_nothing_else() {
         let p = panel();
         let m = *p.metrics();
-        assert_eq!(
-            p.target_at(m.reset.center_x(), m.reset.center_y()),
-            Some(Target::Reset)
-        );
-        assert_eq!(
-            p.target_at(m.save.center_x(), m.save.center_y()),
-            Some(Target::Save)
-        );
+        assert_eq!(p.target_at(m.reset.center_x(), m.reset.center_y()), Some(Target::Reset));
+        assert_eq!(p.target_at(m.save.center_x(), m.save.center_y()), Some(Target::Save));
         assert_eq!(p.target_at(m.hero.center_x(), m.hero.center_y()), None);
     }
 
@@ -1208,10 +1114,7 @@ mod tests {
 
         snap.osc_target = Some("127.0.0.1:9000".into());
         snap.osc_connected = true;
-        assert_eq!(
-            Live::from_snapshot(&snap, now, 1.0).osc,
-            "VRChat 127.0.0.1:9000"
-        );
+        assert_eq!(Live::from_snapshot(&snap, now, 1.0).osc, "VRChat 127.0.0.1:9000");
 
         snap.osc_connected = false;
         assert!(Live::from_snapshot(&snap, now, 1.0).osc.starts_with("VRChat?"));
@@ -1273,9 +1176,7 @@ mod tests {
 
     #[test]
     fn drawing_fills_the_texture_without_panicking() {
-        let Ok(mut renderer) =
-            crate::render::PanelRenderer::new(DESIGN_WIDTH, DESIGN_HEIGHT)
-        else {
+        let Ok(mut renderer) = crate::render::PanelRenderer::new(DESIGN_WIDTH, DESIGN_HEIGHT) else {
             return;
         };
 

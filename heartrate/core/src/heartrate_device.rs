@@ -1,8 +1,9 @@
-use std::pin::Pin;
-use std::time::Duration;
+use std::{pin::Pin, time::Duration};
 
-use btleplug::api::{Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, ValueNotification};
-use btleplug::platform::{Adapter, Manager, Peripheral};
+use btleplug::{
+    api::{Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, ValueNotification},
+    platform::{Adapter, Manager, Peripheral},
+};
 use futures::{Stream, StreamExt};
 use uuid::Uuid;
 

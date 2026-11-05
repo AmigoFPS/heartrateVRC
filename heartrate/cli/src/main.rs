@@ -1,8 +1,9 @@
-
 use std::time::Duration;
 
-use heartrate_core::runtime::{DeviceStatus, Runtime};
-use heartrate_core::settings_manager::AppSettings;
+use heartrate_core::{
+    runtime::{DeviceStatus, Runtime},
+    settings_manager::AppSettings,
+};
 
 fn main() {
     let settings = match AppSettings::load_or_create() {

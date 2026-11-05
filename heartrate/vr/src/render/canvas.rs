@@ -1,9 +1,6 @@
-
-use crate::render::Color;
-use crate::render::text::FontSet;
+use crate::render::{Color, text::FontSet};
 
 pub struct GraphStyle {
-
     pub capacity: usize,
 
     pub full_scale: f32,
@@ -134,16 +131,7 @@ impl Canvas {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn stroke_rounded_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        radius: f32,
-        thickness: f32,
-        color: Color,
-    ) {
+    pub fn stroke_rounded_rect(&mut self, x: f32, y: f32, w: f32, h: f32, radius: f32, thickness: f32, color: Color) {
         if w <= 0.0 || h <= 0.0 || thickness <= 0.0 {
             return;
         }
@@ -250,7 +238,6 @@ impl Canvas {
         for ch in text.chars() {
             let advance = font.advance(ch, px, tabular);
             if !ch.is_whitespace() {
-
                 let glyph = font.glyph(ch, px);
                 let (gw, gh) = (glyph.width, glyph.height);
                 let centering = if tabular && ch.is_ascii_digit() {
@@ -275,15 +262,7 @@ impl Canvas {
         width
     }
 
-    pub fn draw_graph(
-        &mut self,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        samples: &[Option<f32>],
-        style: &GraphStyle,
-    ) {
+    pub fn draw_graph(&mut self, x: f32, y: f32, w: f32, h: f32, samples: &[Option<f32>], style: &GraphStyle) {
         if w <= 0.0 || h <= 0.0 || samples.is_empty() {
             return;
         }
@@ -325,8 +304,7 @@ impl Canvas {
             let line_to = (top + half).ceil() as i32;
             for py in line_from..line_to {
                 let pixel_top = py as f32;
-                let covered = ((pixel_top + 1.0).min(top + half) - pixel_top.max(top - half))
-                    .clamp(0.0, 1.0);
+                let covered = ((pixel_top + 1.0).min(top + half) - pixel_top.max(top - half)).clamp(0.0, 1.0);
                 if covered > 0.0 {
                     self.blend(px, py, style.line, covered);
                 }
@@ -455,14 +433,7 @@ mod tests {
             line: Color::rgba(255, 0, 0, 255),
             fill: Color::rgba(255, 0, 0, 255),
         };
-        c.draw_graph(
-            0.0,
-            0.0,
-            64.0,
-            32.0,
-            &[Some(1.0), None, None, Some(1.0)],
-            &style,
-        );
+        c.draw_graph(0.0, 0.0, 64.0, 32.0, &[Some(1.0), None, None, Some(1.0)], &style);
         assert_eq!(c.pixel(0, 31)[3], 255, "the first reading is drawn");
         assert_eq!(c.pixel(63, 31)[3], 255, "the last reading is drawn");
         assert_eq!(c.pixel(32, 31)[3], 0, "the gap is not bridged");

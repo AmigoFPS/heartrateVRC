@@ -1,9 +1,10 @@
-
 use std::path::{Path, PathBuf};
 
-use crate::applications::Applications;
-use crate::context::{AppKind, VrContext};
-use crate::error::VrError;
+use crate::{
+    applications::Applications,
+    context::{AppKind, VrContext},
+    error::VrError,
+};
 
 pub const APP_KEY: &str = "heartrate.osc.overlay";
 
@@ -115,19 +116,13 @@ pub fn unregister(apps: &Applications) -> Result<PathBuf, VrError> {
     Ok(path)
 }
 
-pub fn manifest_command(
-    register_wanted: Option<bool>,
-    autostart: Option<bool>,
-) -> Result<Vec<String>, VrError> {
+pub fn manifest_command(register_wanted: Option<bool>, autostart: Option<bool>) -> Result<Vec<String>, VrError> {
     let ctx = VrContext::init(AppKind::Background)?;
-    let apps = ctx
-        .applications
-        .as_ref()
-        .ok_or_else(|| VrError::Applications {
-            call: "GetGenericInterface",
-            code: -1,
-            message: "this SteamVR runtime does not expose IVRApplications".into(),
-        })?;
+    let apps = ctx.applications.as_ref().ok_or_else(|| VrError::Applications {
+        call: "GetGenericInterface",
+        code: -1,
+        message: "this SteamVR runtime does not expose IVRApplications".into(),
+    })?;
 
     let mut report = Vec::new();
 
@@ -165,10 +160,7 @@ pub fn manifest_command(
         }
 
         apps.set_auto_launch(APP_KEY, on)?;
-        report.push(format!(
-            "SteamVR auto-start {}",
-            if on { "enabled" } else { "disabled" }
-        ));
+        report.push(format!("SteamVR auto-start {}", if on { "enabled" } else { "disabled" }));
     }
 
     Ok(report)
@@ -185,10 +177,12 @@ mod tests {
         let app = &v["applications"][0];
 
         assert_eq!(app["app_key"], APP_KEY);
-        assert!(app["binary_path_windows"]
-            .as_str()
-            .unwrap()
-            .ends_with("heartrate_gui.exe"));
+        assert!(
+            app["binary_path_windows"]
+                .as_str()
+                .unwrap()
+                .ends_with("heartrate_gui.exe")
+        );
         assert_eq!(app["is_dashboard_overlay"], true);
         assert_eq!(app["arguments"], "--no-gui");
         assert_eq!(app["launch_type"], "binary");

@@ -1,6 +1,7 @@
-
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use fontdue::{Font, FontSettings};
 use log::info;
@@ -27,7 +28,6 @@ pub struct FontSet {
 }
 
 impl FontSet {
-
     pub fn load(configured: &str) -> Result<Self, FontError> {
         let configured = configured.trim();
         let candidates = font_candidates(configured);
@@ -38,7 +38,6 @@ impl FontSet {
             let bytes = match std::fs::read(path) {
                 Ok(b) => b,
                 Err(e) => {
-
                     if !configured.is_empty() && path.as_path() == Path::new(configured) {
                         return Err(FontError::FontRead {
                             path: path.clone(),
@@ -79,7 +78,6 @@ impl FontSet {
     }
 
     fn key(c: char, px: f32) -> (char, u32) {
-
         (c, (px * 4.0).round() as u32)
     }
 
@@ -124,7 +122,6 @@ impl FontSet {
     pub fn measure(&mut self, text: &str, px: f32, tabular: bool) -> f32 {
         text.chars().map(|c| self.advance(c, px, tabular)).sum()
     }
-
 }
 
 fn font_candidates(configured: &str) -> Vec<PathBuf> {

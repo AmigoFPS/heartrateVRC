@@ -62,18 +62,12 @@ impl Cli {
                 other if other.starts_with("--autostart=") => {
                     cli.autostart = Some(parse_bool(&other["--autostart=".len()..])?);
                 }
-                other => {
-                    return Err(ArgError(format!(
-                        "unrecognised argument `{other}`. Try --help."
-                    )))
-                }
+                other => return Err(ArgError(format!("unrecognised argument `{other}`. Try --help."))),
             }
         }
 
         if cli.register && cli.unregister {
-            return Err(ArgError(
-                "--register and --unregister contradict each other".into(),
-            ));
+            return Err(ArgError("--register and --unregister contradict each other".into()));
         }
 
         Ok(cli)

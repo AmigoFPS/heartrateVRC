@@ -1,7 +1,8 @@
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -89,8 +90,8 @@ impl SessionLogger {
         let timestamp = format_filename_timestamp(self.started_at_unix_ms);
         let filename = format!("session_{}.json", timestamp);
         let path = log_dir.join(filename);
-        let json = serde_json::to_string_pretty(&self.snapshot())
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let json =
+            serde_json::to_string_pretty(&self.snapshot()).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         fs::write(&path, json)?;
         Ok(path)
     }
@@ -155,12 +156,7 @@ impl SessionLog {
         }
 
         let mean = brief.avg_bpm as f64;
-        let variance = self
-            .samples
-            .iter()
-            .map(|s| (s.bpm as f64 - mean).powi(2))
-            .sum::<f64>()
-            / n as f64;
+        let variance = self.samples.iter().map(|s| (s.bpm as f64 - mean).powi(2)).sum::<f64>() / n as f64;
         let bpm_stddev = variance.sqrt() as f32;
 
         let (rmssd_avg, rmssd_min, rmssd_max) = stat_minmax_avg(self.samples.iter().filter_map(|s| s.rmssd));

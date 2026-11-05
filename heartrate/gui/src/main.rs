@@ -1,20 +1,17 @@
-
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
 mod cli;
 mod console;
 
-use std::panic::AssertUnwindSafe;
-use std::process::ExitCode;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{panic::AssertUnwindSafe, process::ExitCode, sync::Arc, time::Duration};
 
 use eframe::egui;
-use heartrate_core::runtime::Runtime;
-use heartrate_core::{log_buffer, settings_manager::AppSettings};
-use heartrate_vr::manifest::{self, DASHBOARD_OVERLAY_KEY};
-use heartrate_vr::{Dashboard, InstanceLock};
+use heartrate_core::{log_buffer, runtime::Runtime, settings_manager::AppSettings};
+use heartrate_vr::{
+    Dashboard, InstanceLock,
+    manifest::{self, DASHBOARD_OVERLAY_KEY},
+};
 
 use crate::cli::Cli;
 
@@ -241,8 +238,9 @@ fn install_panic_hook() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::cell::Cell;
+
+    use super::*;
 
     #[test]
     fn a_panicking_window_is_caught_rather_than_killing_the_process() {

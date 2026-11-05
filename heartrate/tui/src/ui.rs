@@ -1,3 +1,4 @@
+use heartrate_core::{hrv::SignalQuality, log_buffer};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -5,8 +6,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Padding, Paragraph, Tabs},
 };
-
-use heartrate_core::{hrv::SignalQuality, log_buffer};
 
 use crate::{
     app::App,

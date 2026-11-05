@@ -1,9 +1,11 @@
-use std::time::{Duration, Instant};
-use std::{sync::mpsc, thread};
+use std::{
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
+};
 
 use color_eyre::Result;
-use ratatui::crossterm::event::{self, Event as CrosstermEvent};
-use ratatui::crossterm::event::{KeyEvent, MouseEvent};
+use ratatui::crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Event {

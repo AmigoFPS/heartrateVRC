@@ -20,9 +20,7 @@ impl System {
 
     pub fn poll_event(&self) -> Option<sys::VREvent_t> {
         let mut event = sys::VREvent_t::default();
-        let got = unsafe {
-            (self.t().PollNextEvent)(&mut event, std::mem::size_of::<sys::VREvent_t>() as u32)
-        };
+        let got = unsafe { (self.t().PollNextEvent)(&mut event, std::mem::size_of::<sys::VREvent_t>() as u32) };
         got.then_some(event)
     }
 

@@ -1,7 +1,11 @@
-use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
-use std::time::Instant;
+use std::{
+    collections::VecDeque,
+    sync::{
+        Mutex, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Instant,
+};
 
 use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 

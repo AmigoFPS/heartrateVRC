@@ -1,10 +1,16 @@
-use std::collections::VecDeque;
-use std::time::{Duration, Instant};
+use std::{
+    collections::VecDeque,
+    time::{Duration, Instant},
+};
 
-use heartrate_core::hrv::{HrvMetrics, SignalQuality};
-use heartrate_core::runtime::{DeviceStatus, Snapshot};
-use heartrate_vr::panel::{self, Input, Live, Panel};
-use heartrate_vr::render::{png, PanelRenderer};
+use heartrate_core::{
+    hrv::{HrvMetrics, SignalQuality},
+    runtime::{DeviceStatus, Snapshot},
+};
+use heartrate_vr::{
+    panel::{self, Input, Live, Panel},
+    render::{PanelRenderer, png},
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = std::env::args()
@@ -99,12 +105,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn write(
-    renderer: &mut PanelRenderer,
-    panel: &Panel,
-    dir: &str,
-    name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn write(renderer: &mut PanelRenderer, panel: &Panel, dir: &str, name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let (_, w, h) = renderer.render(panel);
     let pixels = renderer.straight_alpha_pixels().to_vec();
     let path = format!("{dir}/panel-{name}.png");

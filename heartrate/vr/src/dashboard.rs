@@ -1,18 +1,22 @@
-
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
 use heartrate_core::runtime::Runtime;
 
-use crate::context::{AppKind, VrContext};
-use crate::error::VrError;
-use crate::manifest::{self, DASHBOARD_OVERLAY_KEY, DISPLAY_NAME};
-use crate::overlay::OverlayHandle;
-use crate::panel::{self, Input, Outcome, Panel};
-use crate::render::gpu::GpuTexture;
-use crate::render::{self, PanelRenderer};
-use crate::sys;
+use crate::{
+    context::{AppKind, VrContext},
+    error::VrError,
+    manifest::{self, DASHBOARD_OVERLAY_KEY, DISPLAY_NAME},
+    overlay::OverlayHandle,
+    panel::{self, Input, Outcome, Panel},
+    render::{self, PanelRenderer, gpu::GpuTexture},
+    sys,
+};
 
 const ICON_SIZE: u32 = 128;
 
@@ -91,10 +95,7 @@ impl Dashboard {
     }
 
     fn push(&self, command: DashCommand) {
-        let mut queue = self
-            .commands
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut queue = self.commands.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if !queue.contains(&command) {
             queue.push(command);
         }
@@ -160,26 +161,18 @@ impl ThreadState {
     }
 
     fn take_commands(&self) -> Vec<DashCommand> {
-        let mut queue = self
-            .commands
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut queue = self.commands.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         std::mem::take(&mut *queue)
     }
 
     fn update_status(&self, f: impl FnOnce(&mut DashboardStatus)) {
-        let mut guard = self
-            .status
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut guard = self.status.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         f(&mut guard);
     }
 }
 
 fn set_error(status: &Arc<RwLock<DashboardStatus>>, message: String) {
-    let mut guard = status
-        .write()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut guard = status.write().unwrap_or_else(|poisoned| poisoned.into_inner());
     guard.error = Some(message);
 }
 
@@ -192,18 +185,17 @@ enum SessionEnd {
 fn run(state: ThreadState) {
     log::info!("[VR] SteamVR thread started");
 
-    let mut renderer =
-        match PanelRenderer::new(panel::DESIGN_WIDTH, panel::DESIGN_HEIGHT) {
-            Ok(r) => {
-                log::debug!("[VR] Panel font: {}", r.font_path());
-                r
-            }
-            Err(e) => {
-                log::error!("[VR] {e}; the dashboard tab is unavailable");
-                set_error(&state.status, format!("{e}"));
-                return;
-            }
-        };
+    let mut renderer = match PanelRenderer::new(panel::DESIGN_WIDTH, panel::DESIGN_HEIGHT) {
+        Ok(r) => {
+            log::debug!("[VR] Panel font: {}", r.font_path());
+            r
+        }
+        Err(e) => {
+            log::error!("[VR] {e}; the dashboard tab is unavailable");
+            set_error(&state.status, format!("{e}"));
+            return;
+        }
+    };
 
     let mut announced_failure = false;
 
@@ -219,9 +211,7 @@ fn run(state: ThreadState) {
                             log::info!("[VR] SteamVR is shutting down; exiting with it");
                             state.steamvr_quit.store(true, Ordering::Relaxed);
                         } else {
-                            log::info!(
-                                "[VR] SteamVR is shutting down; heart rate output continues"
-                            );
+                            log::info!("[VR] SteamVR is shutting down; heart rate output continues");
                         }
                     }
                     Ok(SessionEnd::Stopped) => {}
@@ -313,11 +303,7 @@ impl Session {
             return;
         }
 
-        let (handle, thumbnail) = match self
-            .ctx
-            .overlay
-            .create_dashboard(DASHBOARD_OVERLAY_KEY, DISPLAY_NAME)
-        {
+        let (handle, thumbnail) = match self.ctx.overlay.create_dashboard(DASHBOARD_OVERLAY_KEY, DISPLAY_NAME) {
             Ok(pair) => pair,
             Err(e) => {
                 log::warn!("[VR] SteamVR would not give us a dashboard tab: {e}");
@@ -334,13 +320,7 @@ impl Session {
             .and_then(|()| o.set_texture_color_space(handle, sys::EColorSpace_Gamma))
             .and_then(|()| o.set_flag(handle, sys::VROverlayFlags_IsPremultiplied, true))
             .and_then(|()| o.set_input_method(handle, sys::VROverlayInputMethod_Mouse))
-            .and_then(|()| {
-                o.set_mouse_scale(
-                    handle,
-                    panel::DESIGN_WIDTH as f32,
-                    panel::DESIGN_HEIGHT as f32,
-                )
-            });
+            .and_then(|()| o.set_mouse_scale(handle, panel::DESIGN_WIDTH as f32, panel::DESIGN_HEIGHT as f32));
 
         if let Err(e) = configured {
             log::warn!("[VR] Could not set the dashboard tab up: {e}");
@@ -356,11 +336,8 @@ impl Session {
             log::debug!("[VR] Could not paint the dashboard tab icon: {e}");
         }
 
-        let gpu = match GpuTexture::new(
-            self.ctx.system.dxgi_adapter_index(),
-            panel::DESIGN_WIDTH,
-            panel::DESIGN_HEIGHT,
-        ) {
+        let gpu = match GpuTexture::new(self.ctx.system.dxgi_adapter_index(), panel::DESIGN_WIDTH, panel::DESIGN_HEIGHT)
+        {
             Ok(texture) => Some(texture),
             Err(e) => {
                 log::warn!(
@@ -389,11 +366,7 @@ impl Session {
         });
     }
 
-    fn run(
-        &mut self,
-        state: &ThreadState,
-        renderer: &mut PanelRenderer,
-    ) -> Result<SessionEnd, VrError> {
+    fn run(&mut self, state: &ThreadState, renderer: &mut PanelRenderer) -> Result<SessionEnd, VrError> {
         loop {
             if state.is_shutdown() {
                 return Ok(SessionEnd::Stopped);
@@ -426,10 +399,7 @@ impl Session {
                     return Some(SessionEnd::Quit);
                 }
                 sys::VREvent_DriverRequestedQuit | sys::VREvent_ProcessQuit => {
-                    log::debug!(
-                        "[VR] {} - dropping the session",
-                        self.ctx.system.event_name(event.eventType)
-                    );
+                    log::debug!("[VR] {} - dropping the session", self.ctx.system.event_name(event.eventType));
                     return Some(SessionEnd::Restart);
                 }
                 _ => {}
@@ -445,12 +415,8 @@ impl Session {
 
             let input = match event.eventType {
                 sys::VREvent_MouseMove => Some(Input::Move { x, y }),
-                sys::VREvent_MouseButtonDown if mouse.button == sys::VRMouseButton_Left => {
-                    Some(Input::Press { x, y })
-                }
-                sys::VREvent_MouseButtonUp if mouse.button == sys::VRMouseButton_Left => {
-                    Some(Input::Release)
-                }
+                sys::VREvent_MouseButtonDown if mouse.button == sys::VRMouseButton_Left => Some(Input::Press { x, y }),
+                sys::VREvent_MouseButtonUp if mouse.button == sys::VRMouseButton_Left => Some(Input::Release),
                 sys::VREvent_FocusLeave | sys::VREvent_OverlayHidden => Some(Input::Leave),
                 _ => None,
             };
@@ -477,9 +443,7 @@ impl Session {
         total.merge(tab.panel.tick(now));
 
         if total.haptic {
-            self.ctx
-                .overlay
-                .laser_haptic(tab.handle, 0.014, 160.0, 0.35);
+            self.ctx.overlay.laser_haptic(tab.handle, 0.014, 160.0, 0.35);
         }
         total
     }
@@ -491,10 +455,7 @@ impl Session {
         }
 
         let Some(apps) = self.ctx.applications.as_ref() else {
-            set_error(
-                &state.status,
-                "this SteamVR runtime does not expose IVRApplications".to_owned(),
-            );
+            set_error(&state.status, "this SteamVR runtime does not expose IVRApplications".to_owned());
             return;
         };
 
@@ -510,10 +471,7 @@ impl Session {
                         }
                     }
                     apps.set_auto_launch(manifest::APP_KEY, on).map(|()| {
-                        log::info!(
-                            "[VR] SteamVR auto-start {}",
-                            if on { "enabled" } else { "disabled" }
-                        );
+                        log::info!("[VR] SteamVR auto-start {}", if on { "enabled" } else { "disabled" });
                     })
                 }
             };
@@ -542,19 +500,13 @@ impl Session {
         }
     }
 
-    fn tick_panel(
-        &mut self,
-        state: &ThreadState,
-        renderer: &mut PanelRenderer,
-        now: Instant,
-    ) -> bool {
+    fn tick_panel(&mut self, state: &ThreadState, renderer: &mut PanelRenderer, now: Instant) -> bool {
         let Some(tab) = self.tab.as_mut() else {
             return true;
         };
 
         let visible = self.ctx.overlay.is_visible(tab.handle)
-            || (self.ctx.overlay.is_dashboard_visible()
-                && self.ctx.overlay.is_active_dashboard_overlay(tab.handle));
+            || (self.ctx.overlay.is_dashboard_visible() && self.ctx.overlay.is_active_dashboard_overlay(tab.handle));
 
         if visible != tab.visible {
             tab.visible = visible;
@@ -579,9 +531,7 @@ impl Session {
                 state.runtime.read(|snap| {
                     (
                         panel::Live::from_snapshot(snap, now, now_t),
-                        snap.notice
-                            .as_ref()
-                            .map(|n| (n.seq, n.text.clone(), n.is_error)),
+                        snap.notice.as_ref().map(|n| (n.seq, n.text.clone(), n.is_error)),
                     )
                 })
             };
@@ -614,9 +564,7 @@ impl Session {
                     log::warn!("[VR] Direct3D texture update failed: {e}; restarting the session");
                     return false;
                 }
-                self.ctx
-                    .overlay
-                    .set_texture(tab.handle, &gpu.as_openvr_texture())
+                self.ctx.overlay.set_texture(tab.handle, &gpu.as_openvr_texture())
             }
             None => self.ctx.overlay.set_raw_rgba(tab.handle, pixels, w, h),
         };

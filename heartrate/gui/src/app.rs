@@ -1,14 +1,17 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use eframe::egui::{self, Color32, CornerRadius, FontId, RichText, Sense, Stroke, Vec2, ViewportCommand};
 use egui_plot::{Line, Plot};
-
-use heartrate_core::hrv::{HrvMetrics, SignalQuality};
-use heartrate_core::log_buffer;
-use heartrate_core::logger::{self, FullStats, SessionLog};
-use heartrate_core::runtime::{DeviceStatus, Runtime};
+use heartrate_core::{
+    hrv::{HrvMetrics, SignalQuality},
+    log_buffer,
+    logger::{self, FullStats, SessionLog},
+    runtime::{DeviceStatus, Runtime},
+};
 use heartrate_vr::Dashboard;
 
 const BG: Color32 = Color32::from_rgb(13, 13, 23);
@@ -124,11 +127,7 @@ pub struct HeartRateApp {
 }
 
 impl HeartRateApp {
-    pub fn new(
-        cc: &eframe::CreationContext<'_>,
-        runtime: Arc<Runtime>,
-        dashboard: Arc<Dashboard>,
-    ) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, runtime: Arc<Runtime>, dashboard: Arc<Dashboard>) -> Self {
         apply_theme(&cc.egui_ctx);
         Self {
             runtime,
@@ -173,9 +172,7 @@ impl HeartRateApp {
                 self.rmssd_pts.extend(snap.rmssd_history.iter().copied());
             }
 
-            snap.notice
-                .as_ref()
-                .map(|n| (n.seq, n.text.clone(), n.is_error))
+            snap.notice.as_ref().map(|n| (n.seq, n.text.clone(), n.is_error))
         });
 
         let live_active = self.runtime.has_live_session();
@@ -306,10 +303,7 @@ impl HeartRateApp {
     fn repaint_interval(&self, ctx: &egui::Context) -> Duration {
         let (focused, minimized) = ctx.input(|i| {
             let viewport = i.viewport();
-            (
-                viewport.focused.unwrap_or(true),
-                viewport.minimized.unwrap_or(false),
-            )
+            (viewport.focused.unwrap_or(true), viewport.minimized.unwrap_or(false))
         });
 
         if minimized {
@@ -661,7 +655,11 @@ impl HeartRateApp {
                 if icon_btn(ui, IconKind::Close, "Close").clicked() {
                     want_close = true;
                 }
-                let debug_tooltip = if debug { "Back to session logs" } else { "Show debug log" };
+                let debug_tooltip = if debug {
+                    "Back to session logs"
+                } else {
+                    "Show debug log"
+                };
                 if icon_btn_toggled(ui, IconKind::Debug, debug_tooltip, debug).clicked() {
                     want_toggle_debug = true;
                 }
@@ -744,10 +742,7 @@ impl HeartRateApp {
         let status = self.dashboard.status();
 
         let (dot, text) = if status.tab_ready {
-            (
-                GREEN,
-                format!("dashboard tab ready · SteamVR {}", status.runtime_version),
-            )
+            (GREEN, format!("dashboard tab ready · SteamVR {}", status.runtime_version))
         } else if status.connected {
             (AMBER, "connected, waiting for a dashboard tab".to_owned())
         } else {
@@ -809,7 +804,11 @@ impl HeartRateApp {
                     self.logs.debug_follow = !self.logs.debug_follow;
                 }
 
-                let verbose_style = if verbose { ButtonStyle::Primary } else { ButtonStyle::Neutral };
+                let verbose_style = if verbose {
+                    ButtonStyle::Primary
+                } else {
+                    ButtonStyle::Neutral
+                };
                 let resp = pill_btn(ui, "Verbose", TEXT_HI, verbose_style, true);
                 if resp.clicked() {
                     log_buffer::set_verbose(!verbose);
@@ -853,21 +852,13 @@ impl HeartRateApp {
                         for line in log_buffer::range(range.start, range.end) {
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing.x = 6.0;
-                                ui.label(
-                                    RichText::new(line.timestamp())
-                                        .font(font.clone())
-                                        .color(TEXT_LO),
-                                );
+                                ui.label(RichText::new(line.timestamp()).font(font.clone()).color(TEXT_LO));
                                 ui.label(
                                     RichText::new(level_tag(line.level))
                                         .font(font.clone())
                                         .color(level_color(line.level)),
                                 );
-                                ui.label(
-                                    RichText::new(&line.message)
-                                        .font(font.clone())
-                                        .color(TEXT_HI),
-                                );
+                                ui.label(RichText::new(&line.message).font(font.clone()).color(TEXT_HI));
                             });
                         }
                     });

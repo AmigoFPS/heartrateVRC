@@ -1,8 +1,9 @@
-use std::ffi::CString;
-use std::os::raw::c_void;
+use std::{ffi::CString, os::raw::c_void};
 
-use crate::error::VrError;
-use crate::sys::{self, VR_IVROverlay_FnTable};
+use crate::{
+    error::VrError,
+    sys::{self, VR_IVROverlay_FnTable},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OverlayHandle(pub sys::VROverlayHandle_t);
@@ -33,26 +34,16 @@ impl Overlay {
         }
 
         let message = unsafe { sys::cstr_to_string((self.t().GetOverlayErrorNameFromEnum)(code)) };
-        Err(VrError::Overlay {
-            call,
-            code,
-            message,
-        })
+        Err(VrError::Overlay { call, code, message })
     }
 
-    pub fn create_dashboard(
-        &self,
-        key: &str,
-        friendly_name: &str,
-    ) -> Result<(OverlayHandle, OverlayHandle), VrError> {
+    pub fn create_dashboard(&self, key: &str, friendly_name: &str) -> Result<(OverlayHandle, OverlayHandle), VrError> {
         let c_key = CString::new(key).unwrap_or_default();
         let c_name = CString::new(friendly_name).unwrap_or_default();
         let mut main: sys::VROverlayHandle_t = sys::k_ulOverlayHandleInvalid;
         let mut thumb: sys::VROverlayHandle_t = sys::k_ulOverlayHandleInvalid;
 
-        let code = unsafe {
-            (self.t().CreateDashboardOverlay)(c_key.as_ptr(), c_name.as_ptr(), &mut main, &mut thumb)
-        };
+        let code = unsafe { (self.t().CreateDashboardOverlay)(c_key.as_ptr(), c_name.as_ptr(), &mut main, &mut thumb) };
         if code == sys::VROverlayError_KeyInUse {
             return Err(VrError::Init(format!(
                 "the dashboard overlay key {key} is already in use. Another copy of this \
@@ -83,37 +74,20 @@ impl Overlay {
         self.check("SetOverlayAlpha", code)
     }
 
-    pub fn set_flag(
-        &self,
-        h: OverlayHandle,
-        flag: sys::VROverlayFlags,
-        enabled: bool,
-    ) -> Result<(), VrError> {
+    pub fn set_flag(&self, h: OverlayHandle, flag: sys::VROverlayFlags, enabled: bool) -> Result<(), VrError> {
         let code = unsafe { (self.t().SetOverlayFlag)(h.0, flag, enabled) };
         self.check("SetOverlayFlag", code)
     }
 
-    pub fn set_texture_color_space(
-        &self,
-        h: OverlayHandle,
-        space: sys::EColorSpace,
-    ) -> Result<(), VrError> {
+    pub fn set_texture_color_space(&self, h: OverlayHandle, space: sys::EColorSpace) -> Result<(), VrError> {
         let code = unsafe { (self.t().SetOverlayTextureColorSpace)(h.0, space) };
         self.check("SetOverlayTextureColorSpace", code)
     }
 
-    pub fn set_raw_rgba(
-        &self,
-        h: OverlayHandle,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-    ) -> Result<(), VrError> {
+    pub fn set_raw_rgba(&self, h: OverlayHandle, pixels: &[u8], width: u32, height: u32) -> Result<(), VrError> {
         debug_assert_eq!(pixels.len(), (width as usize) * (height as usize) * 4);
 
-        let code = unsafe {
-            (self.t().SetOverlayRaw)(h.0, pixels.as_ptr() as *const c_void, width, height, 4)
-        };
+        let code = unsafe { (self.t().SetOverlayRaw)(h.0, pixels.as_ptr() as *const c_void, width, height, 4) };
         self.check("SetOverlayRaw", code)
     }
 
@@ -141,21 +115,12 @@ impl Overlay {
 
     pub fn poll_event(&self, h: OverlayHandle) -> Option<sys::VREvent_t> {
         let mut event = sys::VREvent_t::default();
-        let got = unsafe {
-            (self.t().PollNextOverlayEvent)(
-                h.0,
-                &mut event,
-                std::mem::size_of::<sys::VREvent_t>() as u32,
-            )
-        };
+        let got =
+            unsafe { (self.t().PollNextOverlayEvent)(h.0, &mut event, std::mem::size_of::<sys::VREvent_t>() as u32) };
         got.then_some(event)
     }
 
-    pub fn set_input_method(
-        &self,
-        h: OverlayHandle,
-        method: sys::VROverlayInputMethod,
-    ) -> Result<(), VrError> {
+    pub fn set_input_method(&self, h: OverlayHandle, method: sys::VROverlayInputMethod) -> Result<(), VrError> {
         let code = unsafe { (self.t().SetOverlayInputMethod)(h.0, method) };
         self.check("SetOverlayInputMethod", code)
     }

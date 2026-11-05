@@ -32,23 +32,30 @@ impl std::error::Error for GpuError {
 #[cfg(windows)]
 mod imp {
     use log::{debug, info};
-    use windows::core::Interface;
-    use windows::Win32::Foundation::HMODULE;
-    use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_UNKNOWN};
-    use windows::Win32::Graphics::Direct3D11::{
-        D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Resource, ID3D11Texture2D,
-        D3D11_BIND_SHADER_RESOURCE, D3D11_CPU_ACCESS_WRITE, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-        D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_WRITE_DISCARD, D3D11_SDK_VERSION,
-        D3D11_TEXTURE2D_DESC, D3D11_USAGE_DYNAMIC,
+    use windows::{
+        Win32::{
+            Foundation::HMODULE,
+            Graphics::{
+                Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_UNKNOWN},
+                Direct3D11::{
+                    D3D11_BIND_SHADER_RESOURCE, D3D11_CPU_ACCESS_WRITE, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                    D3D11_MAP_WRITE_DISCARD, D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC,
+                    D3D11_USAGE_DYNAMIC, D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Resource,
+                    ID3D11Texture2D,
+                },
+                Dxgi::{
+                    Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC},
+                    CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory1,
+                },
+            },
+        },
+        core::Interface,
     };
-    use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC};
-    use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory1};
 
     use super::GpuError;
     use crate::sys;
 
     pub struct GpuTexture {
-
         context: ID3D11DeviceContext,
         texture: ID3D11Texture2D,
         _device: ID3D11Device,
@@ -160,11 +167,7 @@ mod imp {
                 let base = mapped.pData as *mut u8;
                 for row in 0..self.height as usize {
                     let src = &pixels[row * src_pitch..row * src_pitch + src_pitch];
-                    std::ptr::copy_nonoverlapping(
-                        src.as_ptr(),
-                        base.add(row * dst_pitch),
-                        src_pitch,
-                    );
+                    std::ptr::copy_nonoverlapping(src.as_ptr(), base.add(row * dst_pitch), src_pitch);
                 }
                 self.context.Unmap(&resource, 0);
 
@@ -183,11 +186,7 @@ mod imp {
         }
     }
 
-    fn create_texture(
-        device: &ID3D11Device,
-        width: u32,
-        height: u32,
-    ) -> Result<ID3D11Texture2D, GpuError> {
+    fn create_texture(device: &ID3D11Device, width: u32, height: u32) -> Result<ID3D11Texture2D, GpuError> {
         let desc = D3D11_TEXTURE2D_DESC {
             Width: width,
             Height: height,
@@ -195,10 +194,7 @@ mod imp {
             ArraySize: 1,
 
             Format: DXGI_FORMAT_R8G8B8A8_UNORM,
-            SampleDesc: DXGI_SAMPLE_DESC {
-                Count: 1,
-                Quality: 0,
-            },
+            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
             Usage: D3D11_USAGE_DYNAMIC,
             BindFlags: D3D11_BIND_SHADER_RESOURCE.0 as u32,
             CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
@@ -207,11 +203,9 @@ mod imp {
 
         let mut texture: Option<ID3D11Texture2D> = None;
 
-        unsafe { device.CreateTexture2D(&desc, None, Some(&mut texture)) }.map_err(|source| {
-            GpuError::Api {
-                context: "CreateTexture2D",
-                source,
-            }
+        unsafe { device.CreateTexture2D(&desc, None, Some(&mut texture)) }.map_err(|source| GpuError::Api {
+            context: "CreateTexture2D",
+            source,
         })?;
         texture.ok_or(GpuError::Api {
             context: "CreateTexture2D returned no texture",
@@ -220,12 +214,10 @@ mod imp {
     }
 
     fn dxgi_adapter(index: u32) -> Result<IDXGIAdapter, GpuError> {
-
-        let factory: IDXGIFactory1 =
-            unsafe { CreateDXGIFactory1() }.map_err(|source| GpuError::Api {
-                context: "CreateDXGIFactory1",
-                source,
-            })?;
+        let factory: IDXGIFactory1 = unsafe { CreateDXGIFactory1() }.map_err(|source| GpuError::Api {
+            context: "CreateDXGIFactory1",
+            source,
+        })?;
 
         unsafe { factory.EnumAdapters(index) }.map_err(|source| GpuError::Api {
             context: "IDXGIFactory1::EnumAdapters",

@@ -1,4 +1,3 @@
-
 pub mod canvas;
 pub mod gpu;
 pub mod png;
@@ -47,26 +46,15 @@ impl Color {
 
 #[derive(Debug)]
 pub enum FontError {
-    NoFont {
-        tried: String,
-    },
-    FontRead {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    FontParse {
-        path: PathBuf,
-        reason: String,
-    },
+    NoFont { tried: String },
+    FontRead { path: PathBuf, source: std::io::Error },
+    FontParse { path: PathBuf, reason: String },
 }
 
 impl std::fmt::Display for FontError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FontError::NoFont { tried } => write!(
-                f,
-                "no usable font found for the SteamVR panel. Tried: {tried}"
-            ),
+            FontError::NoFont { tried } => write!(f, "no usable font found for the SteamVR panel. Tried: {tried}"),
             FontError::FontRead { path, source } => {
                 write!(f, "could not read font {}: {source}", path.display())
             }
@@ -123,14 +111,7 @@ pub fn tab_icon(size: u32) -> Vec<u8> {
     canvas.clear();
 
     let s = size as f32;
-    canvas.fill_rounded_rect(
-        0.0,
-        0.0,
-        s,
-        s,
-        s * 0.22,
-        Color::rgb(0x16, 0x16, 0x2B),
-    );
+    canvas.fill_rounded_rect(0.0, 0.0, s, s, s * 0.22, Color::rgb(0x16, 0x16, 0x2B));
     canvas.fill_heart(s * 0.5, s * 0.5, s * 0.56, crate::panel::HEART);
 
     canvas.straight_pixels().to_vec()
@@ -164,9 +145,6 @@ mod tests {
     fn the_tab_icon_is_square_rgba_with_something_drawn_on_it() {
         let icon = tab_icon(64);
         assert_eq!(icon.len(), 64 * 64 * 4);
-        assert!(
-            icon.chunks_exact(4).any(|p| p[3] > 0),
-            "the icon must not be fully transparent"
-        );
+        assert!(icon.chunks_exact(4).any(|p| p[3] > 0), "the icon must not be fully transparent");
     }
 }

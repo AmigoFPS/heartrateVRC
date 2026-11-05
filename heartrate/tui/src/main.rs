@@ -7,8 +7,7 @@ pub mod update;
 
 use std::error::Error;
 
-use heartrate_core::runtime::Runtime;
-use heartrate_core::{log_buffer, settings_manager::AppSettings};
+use heartrate_core::{log_buffer, runtime::Runtime, settings_manager::AppSettings};
 use ratatui::{Terminal, prelude::CrosstermBackend};
 
 use crate::{

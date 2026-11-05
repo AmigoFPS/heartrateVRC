@@ -1,9 +1,10 @@
-
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, dead_code)]
 
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_void};
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::CStr,
+    os::raw::{c_char, c_void},
+    path::{Path, PathBuf},
+};
 
 pub type TrackedDeviceIndex_t = u32;
 pub type VROverlayHandle_t = u64;
@@ -127,7 +128,6 @@ pub const VRSettingsError_None: EVRSettingsError = 0;
 
 pub const VRApplicationProperty_Name_String: EVRApplicationProperty = 0;
 
-
 pub mod interfaces {
     pub const IVRSystem: &str = "FnTable:IVRSystem_026";
     pub const IVRApplications: &str = "FnTable:IVRApplications_008";
@@ -137,18 +137,13 @@ pub mod interfaces {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HmdMatrix34_t {
-
     pub m: [[f32; 4]; 3],
 }
 
 impl Default for HmdMatrix34_t {
     fn default() -> Self {
         Self {
-            m: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-            ],
+            m: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]],
         }
     }
 }
@@ -202,7 +197,6 @@ pub struct VREvent_t {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct VREvent_Mouse_t {
-
     pub x: f32,
 
     pub y: f32,
@@ -211,9 +205,7 @@ pub struct VREvent_Mouse_t {
 }
 
 impl VREvent_t {
-
     pub fn mouse(&self) -> VREvent_Mouse_t {
-
         unsafe { std::mem::transmute_copy(&self.data) }
     }
 }
@@ -253,8 +245,7 @@ pub struct VR_IVRSystem_FnTable {
         unsafe extern "C" fn(unDeviceType: ETrackedControllerRole) -> TrackedDeviceIndex_t,
     pub GetControllerRoleForTrackedDeviceIndex:
         unsafe extern "C" fn(unDeviceIndex: TrackedDeviceIndex_t) -> ETrackedControllerRole,
-    pub GetTrackedDeviceClass:
-        unsafe extern "C" fn(unDeviceIndex: TrackedDeviceIndex_t) -> ETrackedDeviceClass,
+    pub GetTrackedDeviceClass: unsafe extern "C" fn(unDeviceIndex: TrackedDeviceIndex_t) -> ETrackedDeviceClass,
     pub IsTrackedDeviceConnected: unsafe extern "C" fn(unDeviceIndex: TrackedDeviceIndex_t) -> bool,
     pub GetBoolTrackedDeviceProperty: unsafe extern "C" fn(
         unDeviceIndex: TrackedDeviceIndex_t,
@@ -278,8 +269,7 @@ pub struct VR_IVRSystem_FnTable {
         pError: *mut ETrackedPropertyError,
     ) -> u32,
     pub GetPropErrorNameFromEnum: UnusedFn,
-    pub PollNextEvent:
-        unsafe extern "C" fn(pEvent: *mut VREvent_t, uncbVREvent: u32) -> bool,
+    pub PollNextEvent: unsafe extern "C" fn(pEvent: *mut VREvent_t, uncbVREvent: u32) -> bool,
     pub PollNextEventWithPose: UnusedFn,
     pub PollNextEventWithPoseAndOverlays: UnusedFn,
     pub GetEventTypeNameFromEnum: unsafe extern "C" fn(eType: u32) -> *const c_char,
@@ -288,11 +278,8 @@ pub struct VR_IVRSystem_FnTable {
     pub GetEyeTrackedFoveationCenterForProjection: UnusedFn,
     pub GetControllerState: UnusedFn,
     pub GetControllerStateWithPose: UnusedFn,
-    pub TriggerHapticPulse: unsafe extern "C" fn(
-        unControllerDeviceIndex: TrackedDeviceIndex_t,
-        unAxisId: u32,
-        usDurationMicroSec: u16,
-    ),
+    pub TriggerHapticPulse:
+        unsafe extern "C" fn(unControllerDeviceIndex: TrackedDeviceIndex_t, unAxisId: u32, usDurationMicroSec: u16),
     pub GetButtonIdNameFromEnum: UnusedFn,
     pub GetControllerAxisTypeNameFromEnum: UnusedFn,
     pub IsInputAvailable: unsafe extern "C" fn() -> bool,
@@ -308,20 +295,15 @@ pub struct VR_IVRSystem_FnTable {
 
 #[repr(C)]
 pub struct VR_IVRApplications_FnTable {
-    pub AddApplicationManifest: unsafe extern "C" fn(
-        pchApplicationManifestFullPath: *const c_char,
-        bTemporary: bool,
-    ) -> EVRApplicationError,
+    pub AddApplicationManifest:
+        unsafe extern "C" fn(pchApplicationManifestFullPath: *const c_char, bTemporary: bool) -> EVRApplicationError,
     pub RemoveApplicationManifest:
         unsafe extern "C" fn(pchApplicationManifestFullPath: *const c_char) -> EVRApplicationError,
     pub IsApplicationInstalled: unsafe extern "C" fn(pchAppKey: *const c_char) -> bool,
     pub GetApplicationCount: UnusedFn,
     pub GetApplicationKeyByIndex: UnusedFn,
-    pub GetApplicationKeyByProcessId: unsafe extern "C" fn(
-        unProcessId: u32,
-        pchAppKey: *mut c_char,
-        unAppKeyBufferLen: u32,
-    ) -> EVRApplicationError,
+    pub GetApplicationKeyByProcessId:
+        unsafe extern "C" fn(unProcessId: u32, pchAppKey: *mut c_char, unAppKeyBufferLen: u32) -> EVRApplicationError,
     pub LaunchApplication: UnusedFn,
     pub LaunchTemplateApplication: UnusedFn,
     pub LaunchApplicationFromMimeType: UnusedFn,
@@ -329,8 +311,7 @@ pub struct VR_IVRApplications_FnTable {
     pub CancelApplicationLaunch: UnusedFn,
     pub IdentifyApplication: UnusedFn,
     pub GetApplicationProcessId: UnusedFn,
-    pub GetApplicationsErrorNameFromEnum:
-        unsafe extern "C" fn(error: EVRApplicationError) -> *const c_char,
+    pub GetApplicationsErrorNameFromEnum: unsafe extern "C" fn(error: EVRApplicationError) -> *const c_char,
     pub GetApplicationPropertyString: unsafe extern "C" fn(
         pchAppKey: *const c_char,
         eProperty: EVRApplicationProperty,
@@ -359,27 +340,21 @@ pub struct VR_IVRApplications_FnTable {
 
 #[repr(C)]
 pub struct VR_IVROverlay_FnTable {
-    pub FindOverlay: unsafe extern "C" fn(
-        pchOverlayKey: *const c_char,
-        pOverlayHandle: *mut VROverlayHandle_t,
-    ) -> EVROverlayError,
+    pub FindOverlay:
+        unsafe extern "C" fn(pchOverlayKey: *const c_char, pOverlayHandle: *mut VROverlayHandle_t) -> EVROverlayError,
     pub CreateOverlay: unsafe extern "C" fn(
         pchOverlayKey: *const c_char,
         pchOverlayName: *const c_char,
         pOverlayHandle: *mut VROverlayHandle_t,
     ) -> EVROverlayError,
     pub CreateSubviewOverlay: UnusedFn,
-    pub DestroyOverlay:
-        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> EVROverlayError,
+    pub DestroyOverlay: unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> EVROverlayError,
     pub GetOverlayKey: UnusedFn,
     pub GetOverlayName: UnusedFn,
-    pub SetOverlayName: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        pchName: *const c_char,
-    ) -> EVROverlayError,
+    pub SetOverlayName:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, pchName: *const c_char) -> EVROverlayError,
     pub GetOverlayImageData: UnusedFn,
-    pub GetOverlayErrorNameFromEnum:
-        unsafe extern "C" fn(error: EVROverlayError) -> *const c_char,
+    pub GetOverlayErrorNameFromEnum: unsafe extern "C" fn(error: EVROverlayError) -> *const c_char,
     pub SetOverlayRenderingPid: UnusedFn,
     pub GetOverlayRenderingPid: UnusedFn,
     pub SetOverlayFlag: unsafe extern "C" fn(
@@ -389,42 +364,27 @@ pub struct VR_IVROverlay_FnTable {
     ) -> EVROverlayError,
     pub GetOverlayFlag: UnusedFn,
     pub GetOverlayFlags: UnusedFn,
-    pub SetOverlayColor: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        fRed: f32,
-        fGreen: f32,
-        fBlue: f32,
-    ) -> EVROverlayError,
+    pub SetOverlayColor:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, fRed: f32, fGreen: f32, fBlue: f32) -> EVROverlayError,
     pub GetOverlayColor: UnusedFn,
-    pub SetOverlayAlpha:
-        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, fAlpha: f32) -> EVROverlayError,
+    pub SetOverlayAlpha: unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, fAlpha: f32) -> EVROverlayError,
     pub GetOverlayAlpha: UnusedFn,
-    pub SetOverlayTexelAspect: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        fTexelAspect: f32,
-    ) -> EVROverlayError,
+    pub SetOverlayTexelAspect:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, fTexelAspect: f32) -> EVROverlayError,
     pub GetOverlayTexelAspect: UnusedFn,
-    pub SetOverlaySortOrder: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        unSortOrder: u32,
-    ) -> EVROverlayError,
+    pub SetOverlaySortOrder:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, unSortOrder: u32) -> EVROverlayError,
     pub GetOverlaySortOrder: UnusedFn,
-    pub SetOverlayWidthInMeters: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        fWidthInMeters: f32,
-    ) -> EVROverlayError,
+    pub SetOverlayWidthInMeters:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, fWidthInMeters: f32) -> EVROverlayError,
     pub GetOverlayWidthInMeters: UnusedFn,
-    pub SetOverlayCurvature: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        fCurvature: f32,
-    ) -> EVROverlayError,
+    pub SetOverlayCurvature:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, fCurvature: f32) -> EVROverlayError,
     pub GetOverlayCurvature: UnusedFn,
     pub SetOverlayPreCurvePitch: UnusedFn,
     pub GetOverlayPreCurvePitch: UnusedFn,
-    pub SetOverlayTextureColorSpace: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        eTextureColorSpace: EColorSpace,
-    ) -> EVROverlayError,
+    pub SetOverlayTextureColorSpace:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, eTextureColorSpace: EColorSpace) -> EVROverlayError,
     pub GetOverlayTextureColorSpace: UnusedFn,
     pub SetOverlayTextureBounds: UnusedFn,
     pub GetOverlayTextureBounds: UnusedFn,
@@ -456,16 +416,11 @@ pub struct VR_IVROverlay_FnTable {
     pub IsOverlayVisible: unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> bool,
     pub GetTransformForOverlayCoordinates: UnusedFn,
     pub WaitFrameSync: unsafe extern "C" fn(nTimeoutMs: u32) -> EVROverlayError,
-    pub PollNextOverlayEvent: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        pEvent: *mut VREvent_t,
-        uncbVREvent: u32,
-    ) -> bool,
+    pub PollNextOverlayEvent:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, pEvent: *mut VREvent_t, uncbVREvent: u32) -> bool,
     pub GetOverlayInputMethod: UnusedFn,
-    pub SetOverlayInputMethod: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        eInputMethod: VROverlayInputMethod,
-    ) -> EVROverlayError,
+    pub SetOverlayInputMethod:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, eInputMethod: VROverlayInputMethod) -> EVROverlayError,
     pub GetOverlayMouseScale: UnusedFn,
     pub SetOverlayMouseScale: unsafe extern "C" fn(
         ulOverlayHandle: VROverlayHandle_t,
@@ -483,12 +438,9 @@ pub struct VR_IVROverlay_FnTable {
     pub SetOverlayCursor: UnusedFn,
     pub SetOverlayCursorPositionOverride: UnusedFn,
     pub ClearOverlayCursorPositionOverride: UnusedFn,
-    pub SetOverlayTexture: unsafe extern "C" fn(
-        ulOverlayHandle: VROverlayHandle_t,
-        pTexture: *const Texture_t,
-    ) -> EVROverlayError,
-    pub ClearOverlayTexture:
-        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> EVROverlayError,
+    pub SetOverlayTexture:
+        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t, pTexture: *const Texture_t) -> EVROverlayError,
+    pub ClearOverlayTexture: unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> EVROverlayError,
     pub SetOverlayRaw: unsafe extern "C" fn(
         ulOverlayHandle: VROverlayHandle_t,
         pvBuffer: *const c_void,
@@ -507,8 +459,7 @@ pub struct VR_IVROverlay_FnTable {
         pThumbnailHandle: *mut VROverlayHandle_t,
     ) -> EVROverlayError,
     pub IsDashboardVisible: unsafe extern "C" fn() -> bool,
-    pub IsActiveDashboardOverlay:
-        unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> bool,
+    pub IsActiveDashboardOverlay: unsafe extern "C" fn(ulOverlayHandle: VROverlayHandle_t) -> bool,
     pub SetDashboardOverlaySceneProcess: UnusedFn,
     pub GetDashboardOverlaySceneProcess: UnusedFn,
     pub ShowDashboard: unsafe extern "C" fn(pchOverlayToShow: *const c_char),
@@ -524,7 +475,6 @@ pub struct VR_IVROverlay_FnTable {
 }
 
 pub struct OpenVrLib {
-
     _lib: libloading::Library,
 
     pub path: PathBuf,
@@ -536,12 +486,9 @@ pub struct OpenVrLib {
     pub VR_ShutdownInternal: unsafe extern "C" fn(),
     pub VR_IsHmdPresent: unsafe extern "C" fn() -> bool,
     pub VR_IsRuntimeInstalled: unsafe extern "C" fn() -> bool,
-    pub VR_GetGenericInterface: unsafe extern "C" fn(
-        pchInterfaceVersion: *const c_char,
-        peError: *mut EVRInitError,
-    ) -> isize,
-    pub VR_GetVRInitErrorAsEnglishDescription:
-        unsafe extern "C" fn(error: EVRInitError) -> *const c_char,
+    pub VR_GetGenericInterface:
+        unsafe extern "C" fn(pchInterfaceVersion: *const c_char, peError: *mut EVRInitError) -> isize,
+    pub VR_GetVRInitErrorAsEnglishDescription: unsafe extern "C" fn(error: EVRInitError) -> *const c_char,
     pub VR_GetVRInitErrorAsSymbol: unsafe extern "C" fn(error: EVRInitError) -> *const c_char,
 }
 
@@ -550,17 +497,9 @@ unsafe impl Sync for OpenVrLib {}
 
 #[derive(Debug)]
 pub enum LoadError {
-    NotFound {
-        searched: String,
-    },
-    Load {
-        path: PathBuf,
-        source: libloading::Error,
-    },
-    MissingSymbol {
-        path: PathBuf,
-        symbol: &'static str,
-    },
+    NotFound { searched: String },
+    Load { path: PathBuf, source: libloading::Error },
+    MissingSymbol { path: PathBuf, symbol: &'static str },
 }
 
 impl std::fmt::Display for LoadError {
@@ -594,7 +533,6 @@ impl std::error::Error for LoadError {
 }
 
 impl OpenVrLib {
-
     pub fn load() -> Result<Self, LoadError> {
         let candidates = dll_candidates();
         let mut last_err: Option<LoadError> = None;
@@ -619,7 +557,6 @@ impl OpenVrLib {
     }
 
     fn load_from(path: &Path) -> Result<Self, LoadError> {
-
         let lib = unsafe { libloading::Library::new(path) }.map_err(|source| LoadError::Load {
             path: path.to_path_buf(),
             source,
@@ -627,8 +564,8 @@ impl OpenVrLib {
 
         macro_rules! sym {
             ($name:literal, $ty:ty) => {{
-                let s: libloading::Symbol<$ty> = unsafe { lib.get(concat!($name, "\0").as_bytes()) }
-                    .map_err(|_| LoadError::MissingSymbol {
+                let s: libloading::Symbol<$ty> =
+                    unsafe { lib.get(concat!($name, "\0").as_bytes()) }.map_err(|_| LoadError::MissingSymbol {
                         path: path.to_path_buf(),
                         symbol: $name,
                     })?;
@@ -662,7 +599,6 @@ impl OpenVrLib {
     }
 
     pub fn init_error_message(&self, err: EVRInitError) -> String {
-
         unsafe {
             let sym = cstr_to_string((self.VR_GetVRInitErrorAsSymbol)(err));
             let desc = cstr_to_string((self.VR_GetVRInitErrorAsEnglishDescription)(err));
@@ -738,12 +674,7 @@ fn registered_runtimes() -> Vec<PathBuf> {
         Ok(v) => v
             .get("runtime")
             .and_then(|r| r.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|s| s.as_str())
-                    .map(PathBuf::from)
-                    .collect()
-            })
+            .map(|arr| arr.iter().filter_map(|s| s.as_str()).map(PathBuf::from).collect())
             .unwrap_or_default(),
         Err(e) => {
             log::debug!("{} is not valid JSON: {e}", path.display());
@@ -784,8 +715,9 @@ fn openvrpaths_file() -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::mem::size_of;
+
+    use super::*;
 
     #[test]
     fn abi_struct_sizes_match_openvr() {

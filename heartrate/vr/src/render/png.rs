@@ -1,4 +1,3 @@
-
 pub fn encode_rgba(width: u32, height: u32, pixels: &[u8]) -> Vec<u8> {
     assert_eq!(pixels.len(), (width as usize) * (height as usize) * 4);
 

@@ -1,15 +1,20 @@
+use std::{
+    collections::VecDeque,
+    path::Path,
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
-use std::collections::VecDeque;
-use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
-
-use crate::heartrate_device::HeartrateDevice;
-use crate::hrv::{HrvAnalyzer, HrvMetrics};
-use crate::logger::{self, SessionLog, SessionLogger};
-use crate::osc::OscSender;
-use crate::settings_manager::AppSettings;
+use crate::{
+    heartrate_device::HeartrateDevice,
+    hrv::{HrvAnalyzer, HrvMetrics},
+    logger::{self, SessionLog, SessionLogger},
+    osc::OscSender,
+    settings_manager::AppSettings,
+};
 
 pub const MAX_HISTORY: usize = 600;
 
@@ -117,19 +122,13 @@ impl Shared {
     }
 
     fn update(&self, f: impl FnOnce(&mut Snapshot)) {
-        let mut snap = self
-            .snapshot
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut snap = self.snapshot.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         f(&mut snap);
         snap.revision = self.revision.fetch_add(1, Ordering::Relaxed) + 1;
     }
 
     fn read<R>(&self, f: impl FnOnce(&Snapshot) -> R) -> R {
-        let snap = self
-            .snapshot
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let snap = self.snapshot.read().unwrap_or_else(|poisoned| poisoned.into_inner());
         f(&snap)
     }
 
@@ -145,10 +144,7 @@ impl Shared {
     }
 
     fn with_session<R>(&self, f: impl FnOnce(&mut Option<SessionLogger>) -> R) -> R {
-        let mut guard = self
-            .session
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut guard = self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         f(&mut guard)
     }
 }
@@ -212,20 +208,16 @@ impl Runtime {
             return;
         }
 
-        self.shared.hrv_suppressed_until_ms.store(
-            self.shared.elapsed_ms() + RESET_SETTLE.as_millis() as u64,
-            Ordering::Relaxed,
-        );
+        self.shared
+            .hrv_suppressed_until_ms
+            .store(self.shared.elapsed_ms() + RESET_SETTLE.as_millis() as u64, Ordering::Relaxed);
         self.shared.update(|s| {
             s.hrv = None;
             s.rmssd_history.clear();
             s.reset_ready_at = Some(now + RESET_COOLDOWN);
         });
         let _ = self.commands.send(Command::ResetHrv);
-        log::info!(
-            "[HRV] Window reset; measurements resume in {}s",
-            RESET_SETTLE.as_secs()
-        );
+        log::info!("[HRV] Window reset; measurements resume in {}s", RESET_SETTLE.as_secs());
     }
 
     pub fn save_log(&self) {
@@ -260,11 +252,7 @@ impl Drop for Runtime {
     }
 }
 
-fn run_worker_thread(
-    shared: Arc<Shared>,
-    settings: AppSettings,
-    commands: std::sync::mpsc::Receiver<Command>,
-) {
+fn run_worker_thread(shared: Arc<Shared>, settings: AppSettings, commands: std::sync::mpsc::Receiver<Command>) {
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -281,11 +269,7 @@ fn run_worker_thread(
     runtime.block_on(pipeline(shared, settings, commands));
 }
 
-async fn pipeline(
-    shared: Arc<Shared>,
-    settings: AppSettings,
-    commands: std::sync::mpsc::Receiver<Command>,
-) {
+async fn pipeline(shared: Arc<Shared>, settings: AppSettings, commands: std::sync::mpsc::Receiver<Command>) {
     let log_dir = logger::default_log_dir();
     let sender = OscSender::new(settings.send_port()).await;
 
@@ -295,10 +279,7 @@ async fn pipeline(
         let mut device = match HeartrateDevice::new().await {
             Ok(d) => d,
             Err(e) => {
-                log::error!(
-                    "[BLE] Bluetooth unavailable: {e}; retrying in {}s...",
-                    ADAPTER_RETRY.as_secs()
-                );
+                log::error!("[BLE] Bluetooth unavailable: {e}; retrying in {}s...", ADAPTER_RETRY.as_secs());
                 shared.update(|s| s.device = DeviceStatus::Error(format!("Bluetooth: {e}")));
                 sleep_interruptible(&shared, ADAPTER_RETRY).await;
                 continue;

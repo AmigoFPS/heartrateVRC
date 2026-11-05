@@ -1,11 +1,12 @@
-use std::ffi::CString;
-use std::sync::OnceLock;
+use std::{ffi::CString, sync::OnceLock};
 
-use crate::applications::Applications;
-use crate::error::VrError;
-use crate::overlay::Overlay;
-use crate::sys::{self, OpenVrLib};
-use crate::system::System;
+use crate::{
+    applications::Applications,
+    error::VrError,
+    overlay::Overlay,
+    sys::{self, OpenVrLib},
+    system::System,
+};
 
 static LIB: OnceLock<OpenVrLib> = OnceLock::new();
 
@@ -79,11 +80,7 @@ impl VrContext {
 
         match built {
             Ok(ctx) => {
-                log::info!(
-                    "[VR] OpenVR session established (runtime {}, {:?})",
-                    ctx.runtime_version,
-                    kind
-                );
+                log::info!("[VR] OpenVR session established (runtime {}, {:?})", ctx.runtime_version, kind);
                 Ok(ctx)
             }
             Err(e) => {

@@ -23,10 +23,7 @@ pub enum VrError {
 
 impl VrError {
     pub fn is_session_lost(&self) -> bool {
-        matches!(
-            self,
-            VrError::Init(_) | VrError::RuntimeNotInstalled | VrError::Overlay { .. }
-        )
+        matches!(self, VrError::Init(_) | VrError::RuntimeNotInstalled | VrError::Overlay { .. })
     }
 }
 
@@ -46,16 +43,10 @@ impl std::fmt::Display for VrError {
                  The bindings in heartrate_vr::sys are transcribed from OpenVR SDK 2.15.6, \
                  which needs a reasonably current SteamVR."
             ),
-            VrError::Overlay {
-                call,
-                code,
-                message,
-            } => write!(f, "IVROverlay::{call} failed: {message} (code {code})"),
-            VrError::Applications {
-                call,
-                code,
-                message,
-            } => write!(f, "IVRApplications::{call} failed: {message} (code {code})"),
+            VrError::Overlay { call, code, message } => write!(f, "IVROverlay::{call} failed: {message} (code {code})"),
+            VrError::Applications { call, code, message } => {
+                write!(f, "IVRApplications::{call} failed: {message} (code {code})")
+            }
         }
     }
 }
@@ -81,16 +72,20 @@ mod tests {
 
     #[test]
     fn overlay_failures_end_the_session_but_a_missing_interface_does_not() {
-        assert!(VrError::Overlay {
-            call: "ShowOverlay",
-            code: 1,
-            message: "whatever".into(),
-        }
-        .is_session_lost());
-        assert!(!VrError::InterfaceUnavailable {
-            version: "FnTable:IVROverlay_028",
-            detail: String::new(),
-        }
-        .is_session_lost());
+        assert!(
+            VrError::Overlay {
+                call: "ShowOverlay",
+                code: 1,
+                message: "whatever".into(),
+            }
+            .is_session_lost()
+        );
+        assert!(
+            !VrError::InterfaceUnavailable {
+                version: "FnTable:IVROverlay_028",
+                detail: String::new(),
+            }
+            .is_session_lost()
+        );
     }
 }

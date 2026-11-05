@@ -1,8 +1,9 @@
-use std::ffi::CString;
-use std::path::Path;
+use std::{ffi::CString, path::Path};
 
-use crate::error::VrError;
-use crate::sys::{self, VR_IVRApplications_FnTable};
+use crate::{
+    error::VrError,
+    sys::{self, VR_IVRApplications_FnTable},
+};
 
 pub struct Applications {
     table: *const VR_IVRApplications_FnTable,
@@ -23,22 +24,15 @@ impl Applications {
             return Ok(());
         }
 
-        let message =
-            unsafe { sys::cstr_to_string((self.t().GetApplicationsErrorNameFromEnum)(code)) };
-        Err(VrError::Applications {
-            call,
-            code,
-            message,
-        })
+        let message = unsafe { sys::cstr_to_string((self.t().GetApplicationsErrorNameFromEnum)(code)) };
+        Err(VrError::Applications { call, code, message })
     }
 
     pub fn add_manifest(&self, path: &Path, temporary: bool) -> Result<(), VrError> {
-        let c = CString::new(path.to_string_lossy().into_owned()).map_err(|_| {
-            VrError::Applications {
-                call: "AddApplicationManifest",
-                code: -1,
-                message: "path contains a NUL byte".into(),
-            }
+        let c = CString::new(path.to_string_lossy().into_owned()).map_err(|_| VrError::Applications {
+            call: "AddApplicationManifest",
+            code: -1,
+            message: "path contains a NUL byte".into(),
         })?;
 
         let code = unsafe { (self.t().AddApplicationManifest)(c.as_ptr(), temporary) };
@@ -46,12 +40,10 @@ impl Applications {
     }
 
     pub fn remove_manifest(&self, path: &Path) -> Result<(), VrError> {
-        let c = CString::new(path.to_string_lossy().into_owned()).map_err(|_| {
-            VrError::Applications {
-                call: "RemoveApplicationManifest",
-                code: -1,
-                message: "path contains a NUL byte".into(),
-            }
+        let c = CString::new(path.to_string_lossy().into_owned()).map_err(|_| VrError::Applications {
+            call: "RemoveApplicationManifest",
+            code: -1,
+            message: "path contains a NUL byte".into(),
         })?;
 
         let code = unsafe { (self.t().RemoveApplicationManifest)(c.as_ptr()) };

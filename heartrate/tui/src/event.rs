@@ -18,10 +18,10 @@ pub enum Event {
 #[derive(Debug)]
 pub struct EventHandler {
     #[allow(dead_code)]
-    sender: mpsc::Sender<Event>,
+    sender:   mpsc::Sender<Event>,
     receiver: mpsc::Receiver<Event>,
     #[allow(dead_code)]
-    handler: thread::JoinHandle<()>,
+    handler:  thread::JoinHandle<()>,
 }
 
 impl EventHandler {

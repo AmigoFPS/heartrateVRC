@@ -36,11 +36,11 @@ impl AppKind {
 }
 
 pub struct VrContext {
-    lib: &'static OpenVrLib,
-    pub system: System,
-    pub overlay: Overlay,
+    lib:              &'static OpenVrLib,
+    pub system:       System,
+    pub overlay:      Overlay,
     pub applications: Option<Applications>,
-    runtime_version: String,
+    runtime_version:  String,
 }
 
 impl VrContext {

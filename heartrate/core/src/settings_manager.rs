@@ -28,13 +28,13 @@ pub fn default_settings_path() -> PathBuf {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AppSettings {
-    send_port: u16,
-    correction: i32,
+    send_port:       u16,
+    correction:      i32,
     float_addresses: Vec<String>,
-    int_addresses: Vec<String>,
-    hrv_addresses: Vec<String>,
+    int_addresses:   Vec<String>,
+    hrv_addresses:   Vec<String>,
     #[serde(default)]
-    hrv_filter: RrFilter,
+    hrv_filter:      RrFilter,
 }
 
 impl AppSettings {
@@ -66,24 +66,24 @@ impl AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            send_port: 9000,
-            correction: 0,
+            send_port:       9000,
+            correction:      0,
             float_addresses: vec![
                 "/avatar/parameters/Heartrate_OSC".to_owned(),
                 "/avatar/parameters/Heartrate2".to_owned(),
                 "/avatar/parameters/HRPercent".to_owned(),
             ],
-            int_addresses: vec![
+            int_addresses:   vec![
                 "/avatar/parameters/HeartrateInt".to_owned(),
                 "/avatar/parameters/HR".to_owned(),
             ],
-            hrv_addresses: vec![
+            hrv_addresses:   vec![
                 "/avatar/parameters/HRV_RMSSD".to_owned(),
                 "/avatar/parameters/HRV_SDNN".to_owned(),
                 "/avatar/parameters/HRV_pNN50".to_owned(),
                 "/avatar/parameters/HRV_Quality".to_owned(),
             ],
-            hrv_filter: RrFilter::default(),
+            hrv_filter:      RrFilter::default(),
         }
     }
 }

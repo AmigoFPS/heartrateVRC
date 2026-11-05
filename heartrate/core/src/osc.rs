@@ -26,8 +26,8 @@ const BPM_FLOAT_SCALE: f32 = 200.0;
 const HRV_MS_FLOAT_SCALE: f32 = 200.0;
 #[derive(Debug, Clone)]
 pub struct VrchatAddress {
-    pub osc_ip: String,
-    pub osc_port: u16,
+    pub osc_ip:    String,
+    pub osc_port:  u16,
     pub http_addr: SocketAddr,
 }
 
@@ -40,35 +40,35 @@ impl VrchatAddress {
 #[derive(Debug, Deserialize)]
 struct HostInfo {
     #[serde(rename = "NAME")]
-    name: String,
+    name:     String,
     #[serde(rename = "OSC_IP")]
-    osc_ip: String,
+    osc_ip:   String,
     #[serde(rename = "OSC_PORT")]
     osc_port: u16,
 }
 
 struct ClientInner {
-    http: reqwest::Client,
-    address: RwLock<Option<VrchatAddress>>,
+    http:     reqwest::Client,
+    address:  RwLock<Option<VrchatAddress>>,
     services: Mutex<HashMap<String, (Vec<IpAddr>, u16)>>,
-    stop: AtomicBool,
+    stop:     AtomicBool,
 }
 
 pub struct VrchatClient {
-    inner: Arc<ClientInner>,
+    inner:       Arc<ClientInner>,
     rescan_task: JoinHandle<()>,
 }
 
 impl VrchatClient {
     pub fn start() -> Self {
         let inner = Arc::new(ClientInner {
-            http: reqwest::Client::builder()
+            http:     reqwest::Client::builder()
                 .timeout(HTTP_TIMEOUT)
                 .build()
                 .unwrap_or_default(),
-            address: RwLock::new(None),
+            address:  RwLock::new(None),
             services: Mutex::new(HashMap::new()),
-            stop: AtomicBool::new(false),
+            stop:     AtomicBool::new(false),
         });
 
         let browse_inner = Arc::clone(&inner);
@@ -284,9 +284,9 @@ fn parse_oscquery_port(content: &str) -> Option<u16> {
 }
 
 pub struct OscSender {
-    socket: Option<UdpSocket>,
-    client: VrchatClient,
-    fallback: String,
+    socket:      Option<UdpSocket>,
+    client:      VrchatClient,
+    fallback:    String,
     on_fallback: AtomicBool,
 }
 
@@ -413,12 +413,12 @@ mod tests {
     #[test]
     fn hrv_normalization_is_clamped() {
         let metrics = HrvMetrics {
-            rmssd: 100.0,
-            sdnn: 400.0,
-            pnn50: 50.0,
-            mean_hr: 60.0,
+            rmssd:        100.0,
+            sdnn:         400.0,
+            pnn50:        50.0,
+            mean_hr:      60.0,
             artifact_pct: 10.0,
-            quality: crate::hrv::SignalQuality::Fair,
+            quality:      crate::hrv::SignalQuality::Fair,
         };
         assert_eq!(normalize_hrv(&metrics), [0.5, 1.0, 0.5, 0.9]);
     }
@@ -426,12 +426,12 @@ mod tests {
     #[test]
     fn hrv_normalization_handles_zero() {
         let metrics = HrvMetrics {
-            rmssd: 0.0,
-            sdnn: 0.0,
-            pnn50: 0.0,
-            mean_hr: 0.0,
+            rmssd:        0.0,
+            sdnn:         0.0,
+            pnn50:        0.0,
+            mean_hr:      0.0,
             artifact_pct: 0.0,
-            quality: crate::hrv::SignalQuality::Good,
+            quality:      crate::hrv::SignalQuality::Good,
         };
         assert_eq!(normalize_hrv(&metrics), [0.0, 0.0, 0.0, 1.0]);
     }

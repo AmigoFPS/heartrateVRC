@@ -78,13 +78,13 @@ pub fn build_manifest(exe: &Path) -> String {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Registration {
-    pub registered: bool,
+    pub registered:  bool,
     pub auto_launch: bool,
 }
 
 pub fn registration(apps: &Applications) -> Registration {
     Registration {
-        registered: apps.is_installed(APP_KEY),
+        registered:  apps.is_installed(APP_KEY),
         auto_launch: apps.auto_launch(APP_KEY),
     }
 }
@@ -92,8 +92,8 @@ pub fn registration(apps: &Applications) -> Registration {
 pub fn register(apps: &Applications, temporary: bool) -> Result<PathBuf, VrError> {
     let path = manifest_path();
     let exe = std::env::current_exe().map_err(|e| VrError::Applications {
-        call: "AddApplicationManifest",
-        code: -1,
+        call:    "AddApplicationManifest",
+        code:    -1,
         message: format!("could not find our own executable: {e}"),
     })?;
 
@@ -101,8 +101,8 @@ pub fn register(apps: &Applications, temporary: bool) -> Result<PathBuf, VrError
         let _ = std::fs::create_dir_all(parent);
     }
     std::fs::write(&path, build_manifest(&exe)).map_err(|e| VrError::Applications {
-        call: "AddApplicationManifest",
-        code: -1,
+        call:    "AddApplicationManifest",
+        code:    -1,
         message: format!("could not write {}: {e}", path.display()),
     })?;
 
@@ -119,8 +119,8 @@ pub fn unregister(apps: &Applications) -> Result<PathBuf, VrError> {
 pub fn manifest_command(register_wanted: Option<bool>, autostart: Option<bool>) -> Result<Vec<String>, VrError> {
     let ctx = VrContext::init(AppKind::Background)?;
     let apps = ctx.applications.as_ref().ok_or_else(|| VrError::Applications {
-        call: "GetGenericInterface",
-        code: -1,
+        call:    "GetGenericInterface",
+        code:    -1,
         message: "this SteamVR runtime does not expose IVRApplications".into(),
     })?;
 
@@ -150,8 +150,8 @@ pub fn manifest_command(register_wanted: Option<bool>, autostart: Option<bool>) 
 
         if !apps.is_installed(APP_KEY) {
             return Err(VrError::Applications {
-                call: "SetApplicationAutoLaunch",
-                code: -1,
+                call:    "SetApplicationAutoLaunch",
+                code:    -1,
                 message: format!(
                     "SteamVR still does not know the application key {APP_KEY}. \
                      Restart SteamVR and run --register again."

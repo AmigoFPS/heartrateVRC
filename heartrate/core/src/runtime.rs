@@ -41,41 +41,41 @@ impl DeviceStatus {
 
 #[derive(Debug, Clone)]
 pub struct Notice {
-    pub seq: u64,
-    pub text: String,
+    pub seq:      u64,
+    pub text:     String,
     pub is_error: bool,
-    pub at: Instant,
+    pub at:       Instant,
 }
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
-    pub device: DeviceStatus,
-    pub bpm: i32,
-    pub hrv: Option<HrvMetrics>,
-    pub bpm_history: VecDeque<[f64; 2]>,
-    pub rmssd_history: VecDeque<[f64; 2]>,
-    pub last_data_t: f64,
-    pub osc_connected: bool,
-    pub osc_target: Option<String>,
-    pub notice: Option<Notice>,
+    pub device:         DeviceStatus,
+    pub bpm:            i32,
+    pub hrv:            Option<HrvMetrics>,
+    pub bpm_history:    VecDeque<[f64; 2]>,
+    pub rmssd_history:  VecDeque<[f64; 2]>,
+    pub last_data_t:    f64,
+    pub osc_connected:  bool,
+    pub osc_target:     Option<String>,
+    pub notice:         Option<Notice>,
     pub reset_ready_at: Option<Instant>,
-    pub revision: u64,
+    pub revision:       u64,
 }
 
 impl Default for Snapshot {
     fn default() -> Self {
         Self {
-            device: DeviceStatus::Scanning,
-            bpm: 0,
-            hrv: None,
-            bpm_history: VecDeque::with_capacity(MAX_HISTORY),
-            rmssd_history: VecDeque::with_capacity(MAX_HISTORY),
-            last_data_t: 0.0,
-            osc_connected: false,
-            osc_target: None,
-            notice: None,
+            device:         DeviceStatus::Scanning,
+            bpm:            0,
+            hrv:            None,
+            bpm_history:    VecDeque::with_capacity(MAX_HISTORY),
+            rmssd_history:  VecDeque::with_capacity(MAX_HISTORY),
+            last_data_t:    0.0,
+            osc_connected:  false,
+            osc_target:     None,
+            notice:         None,
             reset_ready_at: None,
-            revision: 0,
+            revision:       0,
         }
     }
 }
@@ -150,9 +150,9 @@ impl Shared {
 }
 
 pub struct Runtime {
-    shared: Arc<Shared>,
+    shared:   Arc<Shared>,
     commands: std::sync::mpsc::Sender<Command>,
-    worker: Option<std::thread::JoinHandle<()>>,
+    worker:   Option<std::thread::JoinHandle<()>>,
 }
 
 impl Runtime {

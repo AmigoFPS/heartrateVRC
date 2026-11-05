@@ -13,8 +13,8 @@ const CAPACITY: usize = 1000;
 
 #[derive(Debug, Clone)]
 pub struct LogLine {
-    pub t_ms: u64,
-    pub level: Level,
+    pub t_ms:    u64,
+    pub level:   Level,
     pub message: String,
 }
 
@@ -50,8 +50,8 @@ impl Log for BufferLogger {
             return;
         }
         let line = LogLine {
-            t_ms: start().elapsed().as_millis() as u64,
-            level: record.level(),
+            t_ms:    start().elapsed().as_millis() as u64,
+            level:   record.level(),
             message: record.args().to_string(),
         };
         if ECHO.load(Ordering::Relaxed) {
@@ -160,8 +160,8 @@ mod tests {
         clear();
         for i in 0..CAPACITY + 10 {
             push(LogLine {
-                t_ms: i as u64,
-                level: Level::Info,
+                t_ms:    i as u64,
+                level:   Level::Info,
                 message: i.to_string(),
             });
         }

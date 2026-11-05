@@ -56,14 +56,14 @@ impl std::error::Error for BleError {}
 
 #[derive(Debug, Clone, Default)]
 pub struct BpmData {
-    pub bpm: i32,
+    pub bpm:       i32,
     pub intervals: Vec<u16>,
 }
 
 pub struct HeartrateDevice {
-    adapter: Adapter,
-    device: Option<Peripheral>,
-    hr_char: Option<Characteristic>,
+    adapter:       Adapter,
+    device:        Option<Peripheral>,
+    hr_char:       Option<Characteristic>,
     notifications: Option<NotificationStream>,
 }
 

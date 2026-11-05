@@ -5,7 +5,7 @@ pub enum GpuError {
     #[cfg(windows)]
     Api {
         context: &'static str,
-        source: windows::core::Error,
+        source:  windows::core::Error,
     },
 }
 
@@ -59,8 +59,8 @@ mod imp {
         context: ID3D11DeviceContext,
         texture: ID3D11Texture2D,
         _device: ID3D11Device,
-        width: u32,
-        height: u32,
+        width:   u32,
+        height:  u32,
     }
 
     unsafe impl Send for GpuTexture {}
@@ -104,11 +104,11 @@ mod imp {
 
             let device = device.ok_or(GpuError::Api {
                 context: "D3D11CreateDevice returned no device",
-                source: windows::core::Error::empty(),
+                source:  windows::core::Error::empty(),
             })?;
             let context = context.ok_or(GpuError::Api {
                 context: "D3D11CreateDevice returned no context",
-                source: windows::core::Error::empty(),
+                source:  windows::core::Error::empty(),
             })?;
 
             let texture = create_texture(&device, width, height)?;
@@ -179,8 +179,8 @@ mod imp {
 
         pub fn as_openvr_texture(&self) -> sys::Texture_t {
             sys::Texture_t {
-                handle: self.texture.as_raw(),
-                eType: sys::ETextureType_DirectX,
+                handle:      self.texture.as_raw(),
+                eType:       sys::ETextureType_DirectX,
                 eColorSpace: sys::EColorSpace_Gamma,
             }
         }
@@ -188,17 +188,17 @@ mod imp {
 
     fn create_texture(device: &ID3D11Device, width: u32, height: u32) -> Result<ID3D11Texture2D, GpuError> {
         let desc = D3D11_TEXTURE2D_DESC {
-            Width: width,
-            Height: height,
+            Width:     width,
+            Height:    height,
             MipLevels: 1,
             ArraySize: 1,
 
-            Format: DXGI_FORMAT_R8G8B8A8_UNORM,
-            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
-            Usage: D3D11_USAGE_DYNAMIC,
-            BindFlags: D3D11_BIND_SHADER_RESOURCE.0 as u32,
+            Format:         DXGI_FORMAT_R8G8B8A8_UNORM,
+            SampleDesc:     DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            Usage:          D3D11_USAGE_DYNAMIC,
+            BindFlags:      D3D11_BIND_SHADER_RESOURCE.0 as u32,
             CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
-            MiscFlags: 0,
+            MiscFlags:      0,
         };
 
         let mut texture: Option<ID3D11Texture2D> = None;
@@ -209,7 +209,7 @@ mod imp {
         })?;
         texture.ok_or(GpuError::Api {
             context: "CreateTexture2D returned no texture",
-            source: windows::core::Error::empty(),
+            source:  windows::core::Error::empty(),
         })
     }
 
@@ -248,8 +248,8 @@ mod imp {
         }
         pub fn as_openvr_texture(&self) -> sys::Texture_t {
             sys::Texture_t {
-                handle: std::ptr::null_mut(),
-                eType: sys::ETextureType_Invalid,
+                handle:      std::ptr::null_mut(),
+                eType:       sys::ETextureType_Invalid,
                 eColorSpace: sys::EColorSpace_Auto,
             }
         }

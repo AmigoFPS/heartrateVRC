@@ -21,18 +21,18 @@ const RESYNC_MS: f64 = 2_000.0;
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(default)]
 pub struct RrFilter {
-    pub min_rr_ms: f64,
-    pub max_rr_ms: f64,
-    pub max_rel_change: f64,
+    pub min_rr_ms:       f64,
+    pub max_rr_ms:       f64,
+    pub max_rel_change:  f64,
     pub reference_beats: usize,
 }
 
 impl Default for RrFilter {
     fn default() -> Self {
         Self {
-            min_rr_ms: 300.0,
-            max_rr_ms: 2000.0,
-            max_rel_change: 0.20,
+            min_rr_ms:       300.0,
+            max_rr_ms:       2000.0,
+            max_rel_change:  0.20,
             reference_beats: 5,
         }
     }
@@ -67,32 +67,32 @@ impl SignalQuality {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HrvMetrics {
-    pub rmssd: f32,
-    pub sdnn: f32,
-    pub pnn50: f32,
-    pub mean_hr: f32,
+    pub rmssd:        f32,
+    pub sdnn:         f32,
+    pub pnn50:        f32,
+    pub mean_hr:      f32,
     pub artifact_pct: f32,
-    pub quality: SignalQuality,
+    pub quality:      SignalQuality,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct Beat {
-    t_ms: f64,
-    rr_ms: f64,
-    accepted: bool,
+    t_ms:         f64,
+    rr_ms:        f64,
+    accepted:     bool,
     break_before: bool,
 }
 
 pub struct HrvAnalyzer {
-    beats: VecDeque<Beat>,
-    reference: VecDeque<f64>,
-    filter: RrFilter,
-    epoch: Instant,
-    clock_ms: f64,
-    anchored: bool,
-    pending_break: bool,
+    beats:               VecDeque<Beat>,
+    reference:           VecDeque<f64>,
+    filter:              RrFilter,
+    epoch:               Instant,
+    clock_ms:            f64,
+    anchored:            bool,
+    pending_break:       bool,
     consecutive_rejects: usize,
-    poor_reported: bool,
+    poor_reported:       bool,
 }
 
 impl HrvAnalyzer {
@@ -328,14 +328,14 @@ mod tests {
 
     struct Feeder {
         analyzer: HrvAnalyzer,
-        now_ms: f64,
+        now_ms:   f64,
     }
 
     impl Feeder {
         fn new() -> Self {
             Self {
                 analyzer: HrvAnalyzer::new(),
-                now_ms: 0.0,
+                now_ms:   0.0,
             }
         }
 

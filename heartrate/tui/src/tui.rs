@@ -12,7 +12,7 @@ pub type CrosstermTerminal = ratatui::Terminal<ratatui::backend::CrosstermBacken
 use crate::{app::App, event::EventHandler, ui};
 
 pub struct Tui {
-    terminal: CrosstermTerminal,
+    terminal:   CrosstermTerminal,
     pub events: EventHandler,
 }
 

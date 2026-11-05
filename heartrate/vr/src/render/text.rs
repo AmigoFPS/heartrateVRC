@@ -9,19 +9,19 @@ use log::info;
 use crate::render::FontError;
 
 pub struct Glyph {
-    pub width: usize,
+    pub width:  usize,
     pub height: usize,
 
     pub xmin: i32,
 
-    pub ymin: i32,
-    pub advance: f32,
+    pub ymin:     i32,
+    pub advance:  f32,
     pub coverage: Vec<u8>,
 }
 
 pub struct FontSet {
-    font: Font,
-    path: PathBuf,
+    font:  Font,
+    path:  PathBuf,
     cache: HashMap<(char, u32), Glyph>,
 
     digit_advance: HashMap<u32, f32>,
@@ -40,7 +40,7 @@ impl FontSet {
                 Err(e) => {
                     if !configured.is_empty() && path.as_path() == Path::new(configured) {
                         return Err(FontError::FontRead {
-                            path: path.clone(),
+                            path:   path.clone(),
                             source: e,
                         });
                     }
@@ -60,7 +60,7 @@ impl FontSet {
                 Err(reason) => {
                     if !configured.is_empty() && path.as_path() == Path::new(configured) {
                         return Err(FontError::FontParse {
-                            path: path.clone(),
+                            path:   path.clone(),
                             reason: reason.to_string(),
                         });
                     }

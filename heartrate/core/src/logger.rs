@@ -10,14 +10,14 @@ use crate::hrv::HrvMetrics;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Sample {
-    pub t_ms: u64,
-    pub bpm: u16,
+    pub t_ms:         u64,
+    pub bpm:          u16,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub rmssd: Option<f32>,
+    pub rmssd:        Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub sdnn: Option<f32>,
+    pub sdnn:         Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub pnn50: Option<f32>,
+    pub pnn50:        Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub artifact_pct: Option<f32>,
 }
@@ -25,17 +25,17 @@ pub struct Sample {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SessionLog {
     pub started_at_unix_ms: u64,
-    pub duration_ms: u64,
+    pub duration_ms:        u64,
     #[serde(default)]
-    pub device_name: String,
-    pub samples: Vec<Sample>,
+    pub device_name:        String,
+    pub samples:            Vec<Sample>,
 }
 
 pub struct SessionLogger {
-    started_at: Instant,
+    started_at:         Instant,
     started_at_unix_ms: u64,
-    device_name: String,
-    samples: Vec<Sample>,
+    device_name:        String,
+    samples:            Vec<Sample>,
 }
 
 impl SessionLogger {
@@ -241,38 +241,38 @@ fn stat_minmax_avg<I: Iterator<Item = f32>>(iter: I) -> (Option<f32>, Option<f32
 #[derive(Debug, Clone, Default)]
 pub struct BriefStats {
     pub duration_secs: f64,
-    pub sample_count: usize,
-    pub avg_bpm: f32,
-    pub min_bpm: u16,
-    pub max_bpm: u16,
+    pub sample_count:  usize,
+    pub avg_bpm:       f32,
+    pub min_bpm:       u16,
+    pub max_bpm:       u16,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct FullStats {
-    pub brief: BriefStats,
-    pub bpm_stddev: f32,
-    pub rmssd_avg: Option<f32>,
-    pub rmssd_min: Option<f32>,
-    pub rmssd_max: Option<f32>,
-    pub sdnn_avg: Option<f32>,
-    pub sdnn_min: Option<f32>,
-    pub sdnn_max: Option<f32>,
-    pub pnn50_avg: Option<f32>,
-    pub pnn50_min: Option<f32>,
-    pub pnn50_max: Option<f32>,
+    pub brief:        BriefStats,
+    pub bpm_stddev:   f32,
+    pub rmssd_avg:    Option<f32>,
+    pub rmssd_min:    Option<f32>,
+    pub rmssd_max:    Option<f32>,
+    pub sdnn_avg:     Option<f32>,
+    pub sdnn_min:     Option<f32>,
+    pub sdnn_max:     Option<f32>,
+    pub pnn50_avg:    Option<f32>,
+    pub pnn50_min:    Option<f32>,
+    pub pnn50_max:    Option<f32>,
     pub artifact_avg: Option<f32>,
     pub artifact_max: Option<f32>,
-    pub zones: HrZones,
+    pub zones:        HrZones,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct HrZones {
-    pub resting_count: usize,
-    pub light_count: usize,
+    pub resting_count:  usize,
+    pub light_count:    usize,
     pub moderate_count: usize,
     pub vigorous_count: usize,
-    pub maximum_count: usize,
-    pub total: usize,
+    pub maximum_count:  usize,
+    pub total:          usize,
 }
 
 impl HrZones {
@@ -378,31 +378,31 @@ mod tests {
     fn brief_and_full_stats() {
         let log = SessionLog {
             started_at_unix_ms: 0,
-            duration_ms: 10_000,
-            device_name: "test".into(),
-            samples: vec![
+            duration_ms:        10_000,
+            device_name:        "test".into(),
+            samples:            vec![
                 Sample {
-                    t_ms: 0,
-                    bpm: 60,
-                    rmssd: Some(40.0),
-                    sdnn: Some(50.0),
-                    pnn50: Some(10.0),
+                    t_ms:         0,
+                    bpm:          60,
+                    rmssd:        Some(40.0),
+                    sdnn:         Some(50.0),
+                    pnn50:        Some(10.0),
                     artifact_pct: Some(0.0),
                 },
                 Sample {
-                    t_ms: 5_000,
-                    bpm: 80,
-                    rmssd: Some(50.0),
-                    sdnn: Some(60.0),
-                    pnn50: Some(20.0),
+                    t_ms:         5_000,
+                    bpm:          80,
+                    rmssd:        Some(50.0),
+                    sdnn:         Some(60.0),
+                    pnn50:        Some(20.0),
                     artifact_pct: Some(4.0),
                 },
                 Sample {
-                    t_ms: 10_000,
-                    bpm: 100,
-                    rmssd: None,
-                    sdnn: None,
-                    pnn50: None,
+                    t_ms:         10_000,
+                    bpm:          100,
+                    rmssd:        None,
+                    sdnn:         None,
+                    pnn50:        None,
                     artifact_pct: None,
                 },
             ],

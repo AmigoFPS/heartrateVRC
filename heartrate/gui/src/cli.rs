@@ -1,12 +1,12 @@
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Cli {
-    pub no_gui: bool,
-    pub register: bool,
+    pub no_gui:     bool,
+    pub register:   bool,
     pub unregister: bool,
-    pub autostart: Option<bool>,
-    pub verbose: bool,
-    pub help: bool,
-    pub version: bool,
+    pub autostart:  Option<bool>,
+    pub verbose:    bool,
+    pub help:       bool,
+    pub version:    bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

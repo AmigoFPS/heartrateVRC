@@ -37,7 +37,7 @@ pub enum Align {
 }
 
 pub struct Canvas {
-    pub width: u32,
+    pub width:  u32,
     pub height: u32,
 
     pixels: Vec<u8>,
@@ -428,10 +428,10 @@ mod tests {
     fn a_trace_leaves_missing_slots_blank() {
         let mut c = Canvas::new(64, 32);
         let style = GraphStyle {
-            capacity: 4,
+            capacity:   4,
             full_scale: 1.0,
-            line: Color::rgba(255, 0, 0, 255),
-            fill: Color::rgba(255, 0, 0, 255),
+            line:       Color::rgba(255, 0, 0, 255),
+            fill:       Color::rgba(255, 0, 0, 255),
         };
         c.draw_graph(0.0, 0.0, 64.0, 32.0, &[Some(1.0), None, None, Some(1.0)], &style);
         assert_eq!(c.pixel(0, 31)[3], 255, "the first reading is drawn");
@@ -443,10 +443,10 @@ mod tests {
     fn a_short_trace_is_drawn_at_the_recent_end() {
         let mut c = Canvas::new(64, 32);
         let style = GraphStyle {
-            capacity: 4,
+            capacity:   4,
             full_scale: 1.0,
-            line: Color::rgba(0, 255, 0, 255),
-            fill: Color::rgba(0, 255, 0, 255),
+            line:       Color::rgba(0, 255, 0, 255),
+            fill:       Color::rgba(0, 255, 0, 255),
         };
         c.draw_graph(0.0, 0.0, 64.0, 32.0, &[Some(1.0), Some(1.0)], &style);
         assert_eq!(c.pixel(2, 31)[3], 0, "no history yet on the left");

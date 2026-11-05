@@ -76,14 +76,14 @@ impl std::error::Error for FontError {
 
 pub struct PanelRenderer {
     canvas: Canvas,
-    font: FontSet,
+    font:   FontSet,
 }
 
 impl PanelRenderer {
     pub fn new(width: u32, height: u32) -> Result<Self, FontError> {
         Ok(Self {
             canvas: Canvas::new(width, height),
-            font: FontSet::load("")?,
+            font:   FontSet::load("")?,
         })
     }
 

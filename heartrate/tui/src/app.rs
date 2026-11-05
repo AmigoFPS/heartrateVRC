@@ -7,29 +7,29 @@ const MAX_POINTS: usize = 100;
 #[derive(Debug, Clone, PartialEq)]
 pub struct App {
     pub heartrate_data: Vec<(f64, f64)>,
-    pub rmssd_data: Vec<(f64, f64)>,
-    pub sdnn_data: Vec<(f64, f64)>,
-    pub pnn50_data: Vec<(f64, f64)>,
+    pub rmssd_data:     Vec<(f64, f64)>,
+    pub sdnn_data:      Vec<(f64, f64)>,
+    pub pnn50_data:     Vec<(f64, f64)>,
 
-    pub current_bpm: u16,
-    pub current_hrv: Option<HrvMetrics>,
+    pub current_bpm:  u16,
+    pub current_hrv:  Option<HrvMetrics>,
     pub current_page: Page,
-    pub should_quit: bool,
-    pub start_time: std::time::Instant,
+    pub should_quit:  bool,
+    pub start_time:   std::time::Instant,
 }
 
 impl Default for App {
     fn default() -> Self {
         Self {
             heartrate_data: Default::default(),
-            current_bpm: Default::default(),
-            current_hrv: None,
-            rmssd_data: Default::default(),
-            sdnn_data: Default::default(),
-            pnn50_data: Default::default(),
-            current_page: Page::Heartrate,
-            should_quit: Default::default(),
-            start_time: std::time::Instant::now(),
+            current_bpm:    Default::default(),
+            current_hrv:    None,
+            rmssd_data:     Default::default(),
+            sdnn_data:      Default::default(),
+            pnn50_data:     Default::default(),
+            current_page:   Page::Heartrate,
+            should_quit:    Default::default(),
+            start_time:     std::time::Instant::now(),
         }
     }
 }

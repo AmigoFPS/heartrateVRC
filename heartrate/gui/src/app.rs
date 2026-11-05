@@ -66,27 +66,27 @@ impl LayoutMode {
 }
 
 struct LogsView {
-    files: Vec<PathBuf>,
-    selected: SelectedLog,
-    loaded: Option<SessionLog>,
-    load_error: Option<String>,
-    scanned: bool,
+    files:         Vec<PathBuf>,
+    selected:      SelectedLog,
+    loaded:        Option<SessionLog>,
+    load_error:    Option<String>,
+    scanned:       bool,
     export_status: Option<(Instant, String, bool)>,
-    show_debug: bool,
-    debug_follow: bool,
+    show_debug:    bool,
+    debug_follow:  bool,
 }
 
 impl Default for LogsView {
     fn default() -> Self {
         Self {
-            files: Vec::new(),
-            selected: SelectedLog::default(),
-            loaded: None,
-            load_error: None,
-            scanned: false,
+            files:         Vec::new(),
+            selected:      SelectedLog::default(),
+            loaded:        None,
+            load_error:    None,
+            scanned:       false,
             export_status: None,
-            show_debug: false,
-            debug_follow: true,
+            show_debug:    false,
+            debug_follow:  true,
         }
     }
 }
@@ -100,30 +100,30 @@ enum SelectedLog {
 }
 
 struct Toast {
-    text: String,
+    text:     String,
     is_error: bool,
     shown_at: Instant,
 }
 
 pub struct HeartRateApp {
-    runtime: Arc<Runtime>,
-    dashboard: Arc<Dashboard>,
-    status: DeviceStatus,
-    bpm: i32,
-    hrv: Option<HrvMetrics>,
-    bpm_pts: Vec<[f64; 2]>,
-    rmssd_pts: Vec<[f64; 2]>,
-    last_data_t: f64,
+    runtime:             Arc<Runtime>,
+    dashboard:           Arc<Dashboard>,
+    status:              DeviceStatus,
+    bpm:                 i32,
+    hrv:                 Option<HrvMetrics>,
+    bpm_pts:             Vec<[f64; 2]>,
+    rmssd_pts:           Vec<[f64; 2]>,
+    last_data_t:         f64,
     reset_cooldown_left: f32,
-    reset_recharge: f32,
-    notice_seq: u64,
-    live_active: bool,
-    reset_fill_started: Option<Instant>,
-    mode: LayoutMode,
-    previous_mode: LayoutMode,
-    pending_resize: bool,
-    logs: LogsView,
-    toast: Option<Toast>,
+    reset_recharge:      f32,
+    notice_seq:          u64,
+    live_active:         bool,
+    reset_fill_started:  Option<Instant>,
+    mode:                LayoutMode,
+    previous_mode:       LayoutMode,
+    pending_resize:      bool,
+    logs:                LogsView,
+    toast:               Option<Toast>,
 }
 
 impl HeartRateApp {

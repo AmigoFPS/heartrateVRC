@@ -151,8 +151,8 @@ impl Default for HmdMatrix34_t {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Texture_t {
-    pub handle: *mut c_void,
-    pub eType: ETextureType,
+    pub handle:      *mut c_void,
+    pub eType:       ETextureType,
     pub eColorSpace: EColorSpace,
 }
 
@@ -172,11 +172,11 @@ pub struct HmdVector2_t {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TrackedDevicePose_t {
     pub mDeviceToAbsoluteTracking: HmdMatrix34_t,
-    pub vVelocity: HmdVector3_t,
-    pub vAngularVelocity: HmdVector3_t,
-    pub eTrackingResult: ETrackingResult,
-    pub bPoseIsValid: bool,
-    pub bDeviceIsConnected: bool,
+    pub vVelocity:                 HmdVector3_t,
+    pub vAngularVelocity:          HmdVector3_t,
+    pub eTrackingResult:           ETrackingResult,
+    pub bPoseIsValid:              bool,
+    pub bDeviceIsConnected:        bool,
 }
 
 #[repr(C)]
@@ -188,10 +188,10 @@ pub struct VREvent_Data_t {
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct VREvent_t {
-    pub eventType: u32,
+    pub eventType:          u32,
     pub trackedDeviceIndex: TrackedDeviceIndex_t,
-    pub eventAgeSeconds: f32,
-    pub data: VREvent_Data_t,
+    pub eventAgeSeconds:    f32,
+    pub data:               VREvent_Data_t,
 }
 
 #[repr(C)]
@@ -299,19 +299,19 @@ pub struct VR_IVRApplications_FnTable {
         unsafe extern "C" fn(pchApplicationManifestFullPath: *const c_char, bTemporary: bool) -> EVRApplicationError,
     pub RemoveApplicationManifest:
         unsafe extern "C" fn(pchApplicationManifestFullPath: *const c_char) -> EVRApplicationError,
-    pub IsApplicationInstalled: unsafe extern "C" fn(pchAppKey: *const c_char) -> bool,
-    pub GetApplicationCount: UnusedFn,
-    pub GetApplicationKeyByIndex: UnusedFn,
+    pub IsApplicationInstalled:               unsafe extern "C" fn(pchAppKey: *const c_char) -> bool,
+    pub GetApplicationCount:                  UnusedFn,
+    pub GetApplicationKeyByIndex:             UnusedFn,
     pub GetApplicationKeyByProcessId:
         unsafe extern "C" fn(unProcessId: u32, pchAppKey: *mut c_char, unAppKeyBufferLen: u32) -> EVRApplicationError,
-    pub LaunchApplication: UnusedFn,
-    pub LaunchTemplateApplication: UnusedFn,
-    pub LaunchApplicationFromMimeType: UnusedFn,
-    pub LaunchDashboardOverlay: UnusedFn,
-    pub CancelApplicationLaunch: UnusedFn,
-    pub IdentifyApplication: UnusedFn,
-    pub GetApplicationProcessId: UnusedFn,
-    pub GetApplicationsErrorNameFromEnum: unsafe extern "C" fn(error: EVRApplicationError) -> *const c_char,
+    pub LaunchApplication:                    UnusedFn,
+    pub LaunchTemplateApplication:            UnusedFn,
+    pub LaunchApplicationFromMimeType:        UnusedFn,
+    pub LaunchDashboardOverlay:               UnusedFn,
+    pub CancelApplicationLaunch:              UnusedFn,
+    pub IdentifyApplication:                  UnusedFn,
+    pub GetApplicationProcessId:              UnusedFn,
+    pub GetApplicationsErrorNameFromEnum:     unsafe extern "C" fn(error: EVRApplicationError) -> *const c_char,
     pub GetApplicationPropertyString: unsafe extern "C" fn(
         pchAppKey: *const c_char,
         eProperty: EVRApplicationProperty,
@@ -319,23 +319,23 @@ pub struct VR_IVRApplications_FnTable {
         unPropertyValueBufferLen: u32,
         peError: *mut EVRApplicationError,
     ) -> u32,
-    pub GetApplicationPropertyBool: UnusedFn,
-    pub GetApplicationPropertyUint64: UnusedFn,
+    pub GetApplicationPropertyBool:           UnusedFn,
+    pub GetApplicationPropertyUint64:         UnusedFn,
     pub SetApplicationAutoLaunch:
         unsafe extern "C" fn(pchAppKey: *const c_char, bAutoLaunch: bool) -> EVRApplicationError,
-    pub GetApplicationAutoLaunch: unsafe extern "C" fn(pchAppKey: *const c_char) -> bool,
-    pub SetDefaultApplicationForMimeType: UnusedFn,
-    pub GetDefaultApplicationForMimeType: UnusedFn,
-    pub GetApplicationSupportedMimeTypes: UnusedFn,
-    pub GetApplicationsThatSupportMimeType: UnusedFn,
-    pub GetApplicationLaunchArguments: UnusedFn,
-    pub GetStartingApplication: UnusedFn,
-    pub GetSceneApplicationState: UnusedFn,
-    pub PerformApplicationPrelaunchCheck: UnusedFn,
+    pub GetApplicationAutoLaunch:             unsafe extern "C" fn(pchAppKey: *const c_char) -> bool,
+    pub SetDefaultApplicationForMimeType:     UnusedFn,
+    pub GetDefaultApplicationForMimeType:     UnusedFn,
+    pub GetApplicationSupportedMimeTypes:     UnusedFn,
+    pub GetApplicationsThatSupportMimeType:   UnusedFn,
+    pub GetApplicationLaunchArguments:        UnusedFn,
+    pub GetStartingApplication:               UnusedFn,
+    pub GetSceneApplicationState:             UnusedFn,
+    pub PerformApplicationPrelaunchCheck:     UnusedFn,
     pub GetSceneApplicationStateNameFromEnum: UnusedFn,
-    pub LaunchInternalProcess: UnusedFn,
-    pub RegisterSubprocess: UnusedFn,
-    pub GetCurrentSceneProcessId: unsafe extern "C" fn() -> u32,
+    pub LaunchInternalProcess:                UnusedFn,
+    pub RegisterSubprocess:                   UnusedFn,
+    pub GetCurrentSceneProcessId:             unsafe extern "C" fn() -> u32,
 }
 
 #[repr(C)]
@@ -566,7 +566,7 @@ impl OpenVrLib {
             ($name:literal, $ty:ty) => {{
                 let s: libloading::Symbol<$ty> =
                     unsafe { lib.get(concat!($name, "\0").as_bytes()) }.map_err(|_| LoadError::MissingSymbol {
-                        path: path.to_path_buf(),
+                        path:   path.to_path_buf(),
                         symbol: $name,
                     })?;
                 *s
@@ -740,8 +740,8 @@ mod tests {
             ..Default::default()
         };
         let written = VREvent_Mouse_t {
-            x: 640.5,
-            y: 12.25,
+            x:      640.5,
+            y:      12.25,
             button: VRMouseButton_Left,
         };
         unsafe {

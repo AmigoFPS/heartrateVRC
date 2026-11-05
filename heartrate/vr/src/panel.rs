@@ -77,19 +77,19 @@ impl Rect {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Metrics {
-    pub width: f32,
-    pub height: f32,
-    pub s: f32,
-    pub header: Rect,
-    pub hero: Rect,
-    pub hrv: Rect,
-    pub bpm_label: Rect,
-    pub bpm_plot: Rect,
+    pub width:       f32,
+    pub height:      f32,
+    pub s:           f32,
+    pub header:      Rect,
+    pub hero:        Rect,
+    pub hrv:         Rect,
+    pub bpm_label:   Rect,
+    pub bpm_plot:    Rect,
     pub rmssd_label: Rect,
-    pub rmssd_plot: Rect,
-    pub footer: Rect,
-    pub reset: Rect,
-    pub save: Rect,
+    pub rmssd_plot:  Rect,
+    pub footer:      Rect,
+    pub reset:       Rect,
+    pub save:        Rect,
 }
 
 impl Metrics {
@@ -156,8 +156,8 @@ pub enum Input {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Outcome {
     pub reset_hrv: bool,
-    pub save_log: bool,
-    pub haptic: bool,
+    pub save_log:  bool,
+    pub haptic:    bool,
 }
 
 impl Outcome {
@@ -170,17 +170,17 @@ impl Outcome {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Live {
-    pub status: String,
-    pub status_color: Color,
-    pub bpm: Option<i32>,
-    pub rmssd: Option<f32>,
-    pub sdnn: Option<f32>,
-    pub pnn50: Option<f32>,
-    pub quality: Option<(SignalQuality, f32)>,
-    pub bpm_series: Vec<Option<f32>>,
-    pub rmssd_series: Vec<Option<f32>>,
-    pub osc: String,
-    pub osc_color: Color,
+    pub status:         String,
+    pub status_color:   Color,
+    pub bpm:            Option<i32>,
+    pub rmssd:          Option<f32>,
+    pub sdnn:           Option<f32>,
+    pub pnn50:          Option<f32>,
+    pub quality:        Option<(SignalQuality, f32)>,
+    pub bpm_series:     Vec<Option<f32>>,
+    pub rmssd_series:   Vec<Option<f32>>,
+    pub osc:            String,
+    pub osc_color:      Color,
     pub reset_cooldown: u32,
     pub reset_recharge: f32,
 }
@@ -188,17 +188,17 @@ pub struct Live {
 impl Default for Live {
     fn default() -> Self {
         Self {
-            status: "starting…".to_owned(),
-            status_color: TEXT_LO,
-            bpm: None,
-            rmssd: None,
-            sdnn: None,
-            pnn50: None,
-            quality: None,
-            bpm_series: Vec::new(),
-            rmssd_series: Vec::new(),
-            osc: "VRChat: looking…".to_owned(),
-            osc_color: TEXT_LO,
+            status:         "starting…".to_owned(),
+            status_color:   TEXT_LO,
+            bpm:            None,
+            rmssd:          None,
+            sdnn:           None,
+            pnn50:          None,
+            quality:        None,
+            bpm_series:     Vec::new(),
+            rmssd_series:   Vec::new(),
+            osc:            "VRChat: looking…".to_owned(),
+            osc_color:      TEXT_LO,
             reset_cooldown: 0,
             reset_recharge: 1.0,
         }
@@ -328,29 +328,29 @@ fn series(history: &std::collections::VecDeque<[f64; 2]>, now_t: f64, range: (f3
 }
 
 pub struct Panel {
-    metrics: Metrics,
-    live: Live,
-    hover: Option<Target>,
-    pressed: Option<Target>,
-    hold_started: Option<Instant>,
+    metrics:       Metrics,
+    live:          Live,
+    hover:         Option<Target>,
+    pressed:       Option<Target>,
+    hold_started:  Option<Instant>,
     hold_progress: f32,
-    notice: Option<(String, bool, Instant)>,
-    notice_seq: u64,
-    dirty: bool,
+    notice:        Option<(String, bool, Instant)>,
+    notice_seq:    u64,
+    dirty:         bool,
 }
 
 impl Panel {
     pub fn new(width: u32, height: u32) -> Self {
         Self {
-            metrics: Metrics::new(width as f32, height as f32),
-            live: Live::default(),
-            hover: None,
-            pressed: None,
-            hold_started: None,
+            metrics:       Metrics::new(width as f32, height as f32),
+            live:          Live::default(),
+            hover:         None,
+            pressed:       None,
+            hold_started:  None,
             hold_progress: 0.0,
-            notice: None,
-            notice_seq: 0,
-            dirty: true,
+            notice:        None,
+            notice_seq:    0,
+            dirty:         true,
         }
     }
 
@@ -699,10 +699,10 @@ fn draw_trace(
         plot.h - inset * 2.0,
         samples,
         &GraphStyle {
-            capacity: SLOTS,
+            capacity:   SLOTS,
             full_scale: 1.0,
-            line: color,
-            fill: color.fade(0.22),
+            line:       color,
+            fill:       color.fade(0.22),
         },
     );
 }
@@ -738,10 +738,10 @@ fn draw_footer(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
         m.reset,
         &reset_label,
         ButtonState {
-            hover: panel.hover == Some(Target::Reset),
+            hover:   panel.hover == Some(Target::Reset),
             pressed: panel.pressed == Some(Target::Reset),
             enabled: !cooling,
-            fill: if cooling {
+            fill:    if cooling {
                 Some((panel.live.reset_recharge, PURPLE.fade(0.7)))
             } else if panel.hold_progress > 0.0 {
                 Some((panel.hold_progress, WATER))
@@ -758,19 +758,19 @@ fn draw_footer(canvas: &mut Canvas, font: &mut FontSet, panel: &Panel) {
         m.save,
         "SAVE",
         ButtonState {
-            hover: panel.hover == Some(Target::Save),
+            hover:   panel.hover == Some(Target::Save),
             pressed: panel.pressed == Some(Target::Save),
             enabled: true,
-            fill: None,
+            fill:    None,
         },
     );
 }
 
 struct ButtonState {
-    hover: bool,
+    hover:   bool,
     pressed: bool,
     enabled: bool,
-    fill: Option<(f32, Color)>,
+    fill:    Option<(f32, Color)>,
 }
 
 fn draw_button(canvas: &mut Canvas, font: &mut FontSet, s: f32, rect: Rect, label: &str, state: ButtonState) {
@@ -1070,12 +1070,12 @@ mod tests {
             device: DeviceStatus::Connected("Polar H10".into()),
             bpm: 72,
             hrv: Some(HrvMetrics {
-                rmssd: 40.0,
-                sdnn: 50.0,
-                pnn50: 20.0,
-                mean_hr: 72.0,
+                rmssd:        40.0,
+                sdnn:         50.0,
+                pnn50:        20.0,
+                mean_hr:      72.0,
                 artifact_pct: 1.0,
-                quality: SignalQuality::Good,
+                quality:      SignalQuality::Good,
             }),
             last_data_t: 10.0,
             ..Snapshot::default()

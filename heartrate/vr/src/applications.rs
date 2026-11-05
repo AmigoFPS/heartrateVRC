@@ -30,8 +30,8 @@ impl Applications {
 
     pub fn add_manifest(&self, path: &Path, temporary: bool) -> Result<(), VrError> {
         let c = CString::new(path.to_string_lossy().into_owned()).map_err(|_| VrError::Applications {
-            call: "AddApplicationManifest",
-            code: -1,
+            call:    "AddApplicationManifest",
+            code:    -1,
             message: "path contains a NUL byte".into(),
         })?;
 
@@ -41,8 +41,8 @@ impl Applications {
 
     pub fn remove_manifest(&self, path: &Path) -> Result<(), VrError> {
         let c = CString::new(path.to_string_lossy().into_owned()).map_err(|_| VrError::Applications {
-            call: "RemoveApplicationManifest",
-            code: -1,
+            call:    "RemoveApplicationManifest",
+            code:    -1,
             message: "path contains a NUL byte".into(),
         })?;
 

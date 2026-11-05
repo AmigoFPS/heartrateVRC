@@ -139,12 +139,12 @@ mod tests {
         app.update_metrics(
             72,
             Some(&HrvMetrics {
-                rmssd: 42.0,
-                sdnn: 58.0,
-                pnn50: 14.0,
-                mean_hr: 71.0,
+                rmssd:        42.0,
+                sdnn:         58.0,
+                pnn50:        14.0,
+                mean_hr:      71.0,
                 artifact_pct: 8.0,
-                quality: SignalQuality::Fair,
+                quality:      SignalQuality::Fair,
             }),
         );
 

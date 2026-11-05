@@ -33,12 +33,12 @@ const TAB_RETRY: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DashboardStatus {
-    pub connected: bool,
+    pub connected:       bool,
     pub runtime_version: String,
-    pub tab_ready: bool,
-    pub registered: bool,
-    pub auto_launch: bool,
-    pub error: Option<String>,
+    pub tab_ready:       bool,
+    pub registered:      bool,
+    pub auto_launch:     bool,
+    pub error:           Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,11 +47,11 @@ enum DashCommand {
 }
 
 pub struct Dashboard {
-    status: Arc<RwLock<DashboardStatus>>,
-    commands: Arc<Mutex<Vec<DashCommand>>>,
-    stop: Arc<AtomicBool>,
+    status:       Arc<RwLock<DashboardStatus>>,
+    commands:     Arc<Mutex<Vec<DashCommand>>>,
+    stop:         Arc<AtomicBool>,
     steamvr_quit: Arc<AtomicBool>,
-    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    thread:       Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 impl Dashboard {
@@ -147,11 +147,11 @@ impl Drop for Dashboard {
 }
 
 struct ThreadState {
-    runtime: Arc<Runtime>,
-    status: Arc<RwLock<DashboardStatus>>,
-    commands: Arc<Mutex<Vec<DashCommand>>>,
-    stop: Arc<AtomicBool>,
-    steamvr_quit: Arc<AtomicBool>,
+    runtime:           Arc<Runtime>,
+    status:            Arc<RwLock<DashboardStatus>>,
+    commands:          Arc<Mutex<Vec<DashCommand>>>,
+    stop:              Arc<AtomicBool>,
+    steamvr_quit:      Arc<AtomicBool>,
     exit_with_steamvr: bool,
 }
 
@@ -250,23 +250,23 @@ fn run(state: ThreadState) {
 }
 
 struct Session {
-    ctx: VrContext,
-    tab: Option<Tab>,
+    ctx:          VrContext,
+    tab:          Option<Tab>,
     tab_retry_at: Instant,
 }
 
 struct Tab {
-    handle: OverlayHandle,
-    thumbnail: OverlayHandle,
-    panel: Panel,
-    gpu: Option<GpuTexture>,
-    uploaded: Option<u64>,
-    visible: bool,
-    pending: Vec<Input>,
+    handle:              OverlayHandle,
+    thumbnail:           OverlayHandle,
+    panel:               Panel,
+    gpu:                 Option<GpuTexture>,
+    uploaded:            Option<u64>,
+    visible:             bool,
+    pending:             Vec<Input>,
     next_redraw_allowed: Instant,
-    refresh_at: Instant,
-    live_revision: u64,
-    live_refresh_at: Instant,
+    refresh_at:          Instant,
+    live_revision:       u64,
+    live_refresh_at:     Instant,
 }
 
 const INPUT_BACKLOG: usize = 256;

@@ -7,16 +7,16 @@ pub enum VrError {
     Init(String),
     InterfaceUnavailable {
         version: &'static str,
-        detail: String,
+        detail:  String,
     },
     Overlay {
-        call: &'static str,
-        code: i32,
+        call:    &'static str,
+        code:    i32,
         message: String,
     },
     Applications {
-        call: &'static str,
-        code: i32,
+        call:    &'static str,
+        code:    i32,
         message: String,
     },
 }
@@ -74,8 +74,8 @@ mod tests {
     fn overlay_failures_end_the_session_but_a_missing_interface_does_not() {
         assert!(
             VrError::Overlay {
-                call: "ShowOverlay",
-                code: 1,
+                call:    "ShowOverlay",
+                code:    1,
                 message: "whatever".into(),
             }
             .is_session_lost()
@@ -83,7 +83,7 @@ mod tests {
         assert!(
             !VrError::InterfaceUnavailable {
                 version: "FnTable:IVROverlay_028",
-                detail: String::new(),
+                detail:  String::new(),
             }
             .is_session_lost()
         );
